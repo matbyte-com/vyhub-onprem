@@ -1,0 +1,49 @@
+version: '3'
+services:
+  app:
+    image: ghcr.io/matbyte-com/vyhub-onprem:2.0.2-dev2
+    depends_on:
+      - db
+      - geoip-api
+      - pdf-api
+      - loki
+    command: python -m scripts.server_run
+    volumes:
+      - ./.env:/opt/vyhub/.env
+      - ./web:/opt/vyhub/web
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  db:
+    image: postgres:15
+    ports:
+      - 15432:5432
+    environment:
+      POSTGRES_USER: vyhub
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: vyhub
+    volumes:
+      - ./db/init:/docker-entrypoint-initdb.d
+  geoip-api:
+    image: observabilitystack/geoip-api:latest
+  pdf-api:
+    image: ghcr.io/matbyte-com/htmltopdf-api:1.0.0
+    stop_signal: SIGKILL
+  loki:
+    image: grafana/loki:2.8.0
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/local-config.yaml
+  nginx:
+    image: nginx:1
+    volumes:
+      - ./nginx/certs:/etc/certificates/vyhub
+      - ./nginx/vyhub.conf:/etc/nginx/conf.d/default.conf
+      - ./web:/vyhub-web
+    ports:
+      - "8080:80"
+      - "8443:443"
+    depends_on:
+      - app
+
+volumes:
+  vyhub-web:
