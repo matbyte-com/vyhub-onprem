@@ -1,3 +1,5 @@
 web/
 .env
 docker-compose.override.yml
+vyhub.crt
+vyhub.key
