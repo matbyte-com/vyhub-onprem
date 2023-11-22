@@ -1,5 +1,7 @@
 version: '3'
 services:
+  app:
+    image: registry.matbyte.com/vyhub/vyhub-onprem:2.0.7
   db:
     environment:
       POSTGRES_PASSWORD: GEN_DB_SU_PW # superuser password
