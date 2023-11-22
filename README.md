@@ -4,11 +4,7 @@ This is the on-prem version of VyHub. (Also known as "Selfhosting")
 
 ## Setup
 
-1. `mkdir web`
-2. `chown 1000:1000 web`
-3. `cp .env.template .env`
-4. Edit `.env` to your needs
-5. `docker compose up -d`
+Follow the instructions at [the docs](https://docs.vyhub.net/latest/getting_started/selfhosting/#installing).
 
 ## Environment Variables
 

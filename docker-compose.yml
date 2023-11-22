@@ -19,10 +19,10 @@ services:
       - 15432:5432
     environment:
       POSTGRES_USER: postgres # superuser
-      POSTGRES_PASSWORD: password # superuser password
+      POSTGRES_PASSWORD: GEN_DB_SU_PW # superuser password
       POSTGRES_DB: vyhub
       POSTGRES_VYHUB_USER: vyhub
-      POSTGRES_VYHUB_PASSWORD: password
+      POSTGRES_VYHUB_PASSWORD: GEN_DB_PW
     volumes:
       - vyhub-db:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d

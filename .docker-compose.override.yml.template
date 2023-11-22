@@ -1,0 +1,6 @@
+version: '3'
+services:
+  db:
+    environment:
+      POSTGRES_PASSWORD: GEN_DB_SU_PW # superuser password
+      POSTGRES_VYHUB_PASSWORD: GEN_DB_PW # password for the vyhub user
