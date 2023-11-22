@@ -7,10 +7,14 @@ cp -n .docker-compose.override.yml.template docker-compose.override.yml
 
 DB_PW=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 32;)
 DB_SU_PW=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 32;)
+SESSION_SECRET=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 64;)
+CRYPT_SECRET=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 64;)
 
 sed -i "s/GEN_DB_SU_PW/$DB_SU_PW/g" docker-compose.override.yml
 sed -i "s/GEN_DB_PW/$DB_PW/g" docker-compose.override.yml
 sed -i "s/GEN_DB_PW/$DB_PW/g" .env
+sed -i "s/GEN_SESSION_SECRET/$SESSION_SECRET/g" .env
+sed -i "s/GEN_CRYPT_SECRET/$CRYPT_SECRET/g" .env
 
 echo ""
 echo "VyHub onprem files have been initialized."
