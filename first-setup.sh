@@ -1,7 +1,14 @@
 #!/bin/bash
 
+# Exit if .env or docker-compose.override.yml already exist
+if [ -f .env ] || [ -f docker-compose.override.yml ]; then
+    echo "Setup has already been run. If you want to run it again, delete the files .env and docker-compose.override.yml and run this script again."
+    exit 1
+fi
+
 mkdir web
 chown 1000:1000 web
+
 cp -n .env.template .env
 cp -n .docker-compose.override.yml.template docker-compose.override.yml
 
