@@ -15,4 +15,5 @@ services:
       # If there is already a webserver running on the same server, you can change the port and use the
       # reverse proxy functionality of your existing webserver. For example "8443:443" to make VyHub
       # available at https://localhost:8443 on the host system.
+      - "80:80"
       - "443:443"
