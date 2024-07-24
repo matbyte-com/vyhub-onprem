@@ -15,8 +15,8 @@ services:
       - "host.docker.internal:host-gateway"
   db:
     image: postgres:15
-    ports:
-      - 15432:5432
+    # ports:
+    #  - 15432:5432
     environment:
       POSTGRES_USER: postgres # superuser
       POSTGRES_PASSWORD: GEN_DB_SU_PW # superuser password
@@ -44,8 +44,8 @@ services:
       - ./nginx/vyhub.conf:/etc/nginx/conf.d/default.conf
       - ./web:/vyhub-web
     ports:
-      - "8080:80"
-      - "8443:443"
+      - "80:80"
+      - "443:443"
     depends_on:
       - app
 volumes:
