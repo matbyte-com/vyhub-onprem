@@ -6,3 +6,13 @@ services:
     environment:
       POSTGRES_PASSWORD: GEN_DB_SU_PW # superuser password
       POSTGRES_VYHUB_PASSWORD: GEN_DB_PW # password for the vyhub user
+    # Uncomment to make the database available on the host system at localhost port 15432.
+    # Beware to set correct firewall rules to prevent access from the internet.
+    # ports:
+    #  - 15432:5432
+  nginx:
+    ports:
+      # If there is already a webserver running on the same server, you can change the port and use the
+      # reverse proxy functionality of your existing webserver. For example "8443:443" to make VyHub
+      # available at https://localhost:8443 on the host system.
+      - "443:443"
