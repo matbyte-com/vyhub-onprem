@@ -1,0 +1,2784 @@
+{
+    "title": "Chart Values",
+    "type": "object",
+    "properties": {
+        "global": {
+            "type": "object",
+            "properties": {
+                "imageRegistry": {
+                    "type": "string",
+                    "description": "Global Docker image registry",
+                    "default": ""
+                },
+                "imagePullSecrets": {
+                    "type": "array",
+                    "description": "Global Docker registry secret names as an array",
+                    "default": [],
+                    "items": {}
+                },
+                "defaultStorageClass": {
+                    "type": "string",
+                    "description": "Global default StorageClass for Persistent Volume(s)",
+                    "default": ""
+                },
+                "compatibility": {
+                    "type": "object",
+                    "properties": {
+                        "openshift": {
+                            "type": "object",
+                            "properties": {
+                                "adaptSecurityContext": {
+                                    "type": "string",
+                                    "description": "Adapt the securityContext sections of the deployment to make them compatible with Openshift restricted-v2 SCC: remove runAsUser, runAsGroup and fsGroup and let the platform use their allowed default IDs. Possible values: auto (apply if the detected running cluster is Openshift), force (perform the adaptation always), disabled (do not perform adaptation)",
+                                    "default": "auto"
+                                }
+                            }
+                        },
+                        "omitEmptySeLinuxOptions": {
+                            "type": "boolean",
+                            "description": "If set to true, removes the seLinuxOptions from the securityContexts when it is set to an empty object",
+                            "default": false
+                        }
+                    }
+                }
+            }
+        },
+        "kubeVersion": {
+            "type": "string",
+            "description": "Override Kubernetes version",
+            "default": ""
+        },
+        "nameOverride": {
+            "type": "string",
+            "description": "String to partially override common.names.name",
+            "default": ""
+        },
+        "fullnameOverride": {
+            "type": "string",
+            "description": "String to fully override common.names.fullname",
+            "default": ""
+        },
+        "namespaceOverride": {
+            "type": "string",
+            "description": "String to fully override common.names.namespace",
+            "default": ""
+        },
+        "commonLabels": {
+            "type": "object",
+            "description": "Labels to add to all deployed objects",
+            "default": {}
+        },
+        "commonAnnotations": {
+            "type": "object",
+            "description": "Annotations to add to all deployed objects",
+            "default": {}
+        },
+        "clusterDomain": {
+            "type": "string",
+            "description": "Kubernetes cluster domain name",
+            "default": "cluster.local"
+        },
+        "extraDeploy": {
+            "type": "array",
+            "description": "Array of extra objects to deploy with the release",
+            "default": [],
+            "items": {}
+        },
+        "diagnosticMode": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable diagnostic mode (all probes will be disabled and the command will be overridden)",
+                    "default": false
+                },
+                "command": {
+                    "type": "array",
+                    "description": "Command to override all containers in the chart release",
+                    "default": [
+                        "sleep"
+                    ],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "args": {
+                    "type": "array",
+                    "description": "Args to override all containers in the chart release",
+                    "default": [
+                        "infinity"
+                    ],
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "app": {
+            "type": "object",
+            "properties": {
+                "image": {
+                    "type": "object",
+                    "properties": {
+                        "registry": {
+                            "type": "string",
+                            "description": "VyHub app image registry",
+                            "default": "registry.matbyte.com"
+                        },
+                        "repository": {
+                            "type": "string",
+                            "description": "VyHub app image repository",
+                            "default": "vyhub/vyhub-onprem"
+                        },
+                        "digest": {
+                            "type": "string",
+                            "description": "VyHub app image digest in the way sha256:aa.... Please note this parameter, if set, will override the tag image tag (immutable tags are recommended)",
+                            "default": ""
+                        },
+                        "pullPolicy": {
+                            "type": "string",
+                            "description": "VyHub app image pull policy",
+                            "default": "IfNotPresent"
+                        },
+                        "pullSecrets": {
+                            "type": "array",
+                            "description": "VyHub app image pull secrets",
+                            "default": [],
+                            "items": {}
+                        },
+                        "debug": {
+                            "type": "boolean",
+                            "description": "Enable VyHub app image debug mode",
+                            "default": false
+                        }
+                    }
+                },
+                "replicaCount": {
+                    "type": "number",
+                    "description": "Number of VyHub app replicas to deploy",
+                    "default": 1
+                },
+                "containerPorts": {
+                    "type": "object",
+                    "properties": {
+                        "http": {
+                            "type": "number",
+                            "description": "VyHub app HTTP container port",
+                            "default": 5050
+                        }
+                    }
+                },
+                "extraContainerPorts": {
+                    "type": "array",
+                    "description": "Optionally specify extra list of additional ports for VyHub app containers",
+                    "default": [],
+                    "items": {}
+                },
+                "livenessProbe": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable livenessProbe on VyHub app containers",
+                            "default": true
+                        },
+                        "initialDelaySeconds": {
+                            "type": "number",
+                            "description": "Initial delay seconds for livenessProbe",
+                            "default": 10
+                        },
+                        "periodSeconds": {
+                            "type": "number",
+                            "description": "Period seconds for livenessProbe",
+                            "default": 15
+                        },
+                        "timeoutSeconds": {
+                            "type": "number",
+                            "description": "Timeout seconds for livenessProbe",
+                            "default": 5
+                        },
+                        "failureThreshold": {
+                            "type": "number",
+                            "description": "Failure threshold for livenessProbe",
+                            "default": 3
+                        },
+                        "successThreshold": {
+                            "type": "number",
+                            "description": "Success threshold for livenessProbe",
+                            "default": 1
+                        }
+                    }
+                },
+                "readinessProbe": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable readinessProbe on VyHub app containers",
+                            "default": true
+                        },
+                        "initialDelaySeconds": {
+                            "type": "number",
+                            "description": "Initial delay seconds for readinessProbe",
+                            "default": 5
+                        },
+                        "periodSeconds": {
+                            "type": "number",
+                            "description": "Period seconds for readinessProbe",
+                            "default": 10
+                        },
+                        "timeoutSeconds": {
+                            "type": "number",
+                            "description": "Timeout seconds for readinessProbe",
+                            "default": 3
+                        },
+                        "failureThreshold": {
+                            "type": "number",
+                            "description": "Failure threshold for readinessProbe",
+                            "default": 3
+                        },
+                        "successThreshold": {
+                            "type": "number",
+                            "description": "Success threshold for readinessProbe",
+                            "default": 1
+                        }
+                    }
+                },
+                "startupProbe": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable startupProbe on VyHub app containers",
+                            "default": true
+                        },
+                        "initialDelaySeconds": {
+                            "type": "number",
+                            "description": "Initial delay seconds for startupProbe",
+                            "default": 0
+                        },
+                        "periodSeconds": {
+                            "type": "number",
+                            "description": "Period seconds for startupProbe",
+                            "default": 5
+                        },
+                        "timeoutSeconds": {
+                            "type": "number",
+                            "description": "Timeout seconds for startupProbe",
+                            "default": 5
+                        },
+                        "failureThreshold": {
+                            "type": "number",
+                            "description": "Failure threshold for startupProbe",
+                            "default": 60
+                        },
+                        "successThreshold": {
+                            "type": "number",
+                            "description": "Success threshold for startupProbe",
+                            "default": 1
+                        }
+                    }
+                },
+                "customLivenessProbe": {
+                    "type": "object",
+                    "description": "Custom livenessProbe that overrides the default one",
+                    "default": {}
+                },
+                "customReadinessProbe": {
+                    "type": "object",
+                    "description": "Custom readinessProbe that overrides the default one",
+                    "default": {}
+                },
+                "customStartupProbe": {
+                    "type": "object",
+                    "description": "Custom startupProbe that overrides the default one",
+                    "default": {}
+                },
+                "resourcesPreset": {
+                    "type": "string",
+                    "description": "Set VyHub app container resources according to one common preset (allowed values: none, nano, small, medium, large, xlarge, 2xlarge). This is ignored if app.resources is set (app.resources is recommended for production).",
+                    "default": "small"
+                },
+                "resources": {
+                    "type": "object",
+                    "description": "Set VyHub app container requests and limits for different resources like CPU or memory (essential for production workloads)",
+                    "default": {}
+                },
+                "podSecurityContext": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable VyHub app pods' Security Context",
+                            "default": true
+                        },
+                        "fsGroupChangePolicy": {
+                            "type": "string",
+                            "description": "Set filesystem group change policy for VyHub app pods",
+                            "default": "Always"
+                        },
+                        "sysctls": {
+                            "type": "array",
+                            "description": "Set kernel settings using the sysctl interface for VyHub app pods",
+                            "default": [],
+                            "items": {}
+                        },
+                        "supplementalGroups": {
+                            "type": "array",
+                            "description": "Set filesystem extra groups for VyHub app pods",
+                            "default": [],
+                            "items": {}
+                        },
+                        "fsGroup": {
+                            "type": "number",
+                            "description": "Set fsGroup in VyHub app pods' Security Context",
+                            "default": 1001
+                        }
+                    }
+                },
+                "containerSecurityContext": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enabled VyHub app container' Security Context",
+                            "default": true
+                        },
+                        "runAsUser": {
+                            "type": "number",
+                            "description": "Set runAsUser in VyHub app container' Security Context",
+                            "default": 1001
+                        },
+                        "runAsGroup": {
+                            "type": "number",
+                            "description": "Set runAsGroup in VyHub app container' Security Context",
+                            "default": 1001
+                        },
+                        "runAsNonRoot": {
+                            "type": "boolean",
+                            "description": "Set runAsNonRoot in VyHub app container' Security Context",
+                            "default": true
+                        },
+                        "readOnlyRootFilesystem": {
+                            "type": "boolean",
+                            "description": "Set readOnlyRootFilesystem in VyHub app container' Security Context",
+                            "default": true
+                        },
+                        "privileged": {
+                            "type": "boolean",
+                            "description": "Set privileged in VyHub app container' Security Context",
+                            "default": false
+                        },
+                        "allowPrivilegeEscalation": {
+                            "type": "boolean",
+                            "description": "Set allowPrivilegeEscalation in VyHub app container' Security Context",
+                            "default": false
+                        },
+                        "capabilities": {
+                            "type": "object",
+                            "properties": {
+                                "drop": {
+                                    "type": "array",
+                                    "description": "List of capabilities to be dropped in VyHub app container",
+                                    "default": [
+                                        "ALL"
+                                    ],
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        },
+                        "seccompProfile": {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "description": "Set seccomp profile in VyHub app container",
+                                    "default": "RuntimeDefault"
+                                }
+                            }
+                        }
+                    }
+                },
+                "command": {
+                    "type": "array",
+                    "description": "Override default VyHub app container command (useful when using custom images)",
+                    "default": [],
+                    "items": {}
+                },
+                "args": {
+                    "type": "array",
+                    "description": "Override default VyHub app container args (useful when using custom images)",
+                    "default": [],
+                    "items": {}
+                },
+                "automountServiceAccountToken": {
+                    "type": "boolean",
+                    "description": "Mount Service Account token in VyHub app pods",
+                    "default": false
+                },
+                "hostAliases": {
+                    "type": "array",
+                    "description": "VyHub app pods host aliases",
+                    "default": [],
+                    "items": {}
+                },
+                "daemonsetAnnotations": {
+                    "type": "object",
+                    "description": "Annotations for VyHub app daemonset",
+                    "default": {}
+                },
+                "deploymentAnnotations": {
+                    "type": "object",
+                    "description": "Annotations for VyHub app deployment",
+                    "default": {}
+                },
+                "statefulsetAnnotations": {
+                    "type": "object",
+                    "description": "Annotations for VyHub app statefulset",
+                    "default": {}
+                },
+                "podLabels": {
+                    "type": "object",
+                    "description": "Extra labels for VyHub app pods",
+                    "default": {}
+                },
+                "podAnnotations": {
+                    "type": "object",
+                    "description": "Annotations for VyHub app pods",
+                    "default": {}
+                },
+                "podAffinityPreset": {
+                    "type": "string",
+                    "description": "Pod affinity preset. Ignored if `app.affinity` is set. Allowed values: `soft` or `hard`",
+                    "default": ""
+                },
+                "podAntiAffinityPreset": {
+                    "type": "string",
+                    "description": "Pod anti-affinity preset. Ignored if `app.affinity` is set. Allowed values: `soft` or `hard`",
+                    "default": "soft"
+                },
+                "nodeAffinityPreset": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "description": "Node affinity preset type. Ignored if `app.affinity` is set. Allowed values: `soft` or `hard`",
+                            "default": ""
+                        },
+                        "key": {
+                            "type": "string",
+                            "description": "Node label key to match. Ignored if `app.affinity` is set",
+                            "default": ""
+                        },
+                        "values": {
+                            "type": "array",
+                            "description": "Node label values to match. Ignored if `app.affinity` is set",
+                            "default": [],
+                            "items": {}
+                        }
+                    }
+                },
+                "affinity": {
+                    "type": "object",
+                    "description": "Affinity for VyHub app pods assignment",
+                    "default": {}
+                },
+                "nodeSelector": {
+                    "type": "object",
+                    "description": "Node labels for VyHub app pods assignment",
+                    "default": {}
+                },
+                "tolerations": {
+                    "type": "array",
+                    "description": "Tolerations for VyHub app pods assignment",
+                    "default": [],
+                    "items": {}
+                },
+                "updateStrategy": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "description": "VyHub app deployment strategy type",
+                            "default": "RollingUpdate"
+                        }
+                    }
+                },
+                "priorityClassName": {
+                    "type": "string",
+                    "description": "VyHub app pods' priorityClassName",
+                    "default": ""
+                },
+                "topologySpreadConstraints": {
+                    "type": "array",
+                    "description": "Topology Spread Constraints for VyHub app pod assignment spread across your cluster among failure-domains",
+                    "default": [],
+                    "items": {}
+                },
+                "schedulerName": {
+                    "type": "string",
+                    "description": "Name of the k8s scheduler (other than default) for VyHub app pods",
+                    "default": ""
+                },
+                "terminationGracePeriodSeconds": {
+                    "type": "string",
+                    "description": "Seconds VyHub app pods need to terminate gracefully",
+                    "default": ""
+                },
+                "lifecycleHooks": {
+                    "type": "object",
+                    "description": "for VyHub app containers to automate configuration before or after startup",
+                    "default": {}
+                },
+                "extraEnvVars": {
+                    "type": "array",
+                    "description": "Array with extra environment variables to add to VyHub app containers",
+                    "default": [],
+                    "items": {}
+                },
+                "extraEnvVarsCM": {
+                    "type": "string",
+                    "description": "Name of existing ConfigMap containing extra env vars for VyHub app containers",
+                    "default": ""
+                },
+                "extraEnvVarsSecret": {
+                    "type": "string",
+                    "description": "Name of existing Secret containing extra env vars for VyHub app containers",
+                    "default": ""
+                },
+                "extraVolumes": {
+                    "type": "array",
+                    "description": "Optionally specify extra list of additional volumes for the VyHub app pods",
+                    "default": [],
+                    "items": {}
+                },
+                "extraVolumeMounts": {
+                    "type": "array",
+                    "description": "Optionally specify extra list of additional volumeMounts for the VyHub app containers",
+                    "default": [],
+                    "items": {}
+                },
+                "sidecars": {
+                    "type": "array",
+                    "description": "Add additional sidecar containers to the VyHub app pods",
+                    "default": [],
+                    "items": {}
+                },
+                "initContainers": {
+                    "type": "array",
+                    "description": "Add additional init containers to the VyHub app pods",
+                    "default": [],
+                    "items": {}
+                },
+                "pdb": {
+                    "type": "object",
+                    "properties": {
+                        "create": {
+                            "type": "boolean",
+                            "description": "Enable/disable a Pod Disruption Budget creation",
+                            "default": true
+                        },
+                        "minAvailable": {
+                            "type": "string",
+                            "description": "Minimum number/percentage of pods that should remain scheduled",
+                            "default": ""
+                        },
+                        "maxUnavailable": {
+                            "type": "string",
+                            "description": "Maximum number/percentage of pods that may be made unavailable. Defaults to `1` if both `app.pdb.minAvailable` and `app.pdb.maxUnavailable` are empty.",
+                            "default": ""
+                        }
+                    }
+                },
+                "autoscaling": {
+                    "type": "object",
+                    "properties": {
+                        "vpa": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean",
+                                    "description": "Enable VPA for VyHub app pods",
+                                    "default": false
+                                },
+                                "annotations": {
+                                    "type": "object",
+                                    "description": "Annotations for VPA resource",
+                                    "default": {}
+                                },
+                                "controlledResources": {
+                                    "type": "array",
+                                    "description": "VPA List of resources that the vertical pod autoscaler can control. Defaults to cpu and memory",
+                                    "default": [],
+                                    "items": {}
+                                },
+                                "maxAllowed": {
+                                    "type": "object",
+                                    "description": "VPA Max allowed resources for the pod",
+                                    "default": {}
+                                },
+                                "minAllowed": {
+                                    "type": "object",
+                                    "description": "VPA Min allowed resources for the pod",
+                                    "default": {}
+                                },
+                                "updatePolicy": {
+                                    "type": "object",
+                                    "properties": {
+                                        "updateMode": {
+                                            "type": "string",
+                                            "description": "Autoscaling update policy",
+                                            "default": "Auto"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "hpa": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean",
+                                    "description": "Enable HPA for VyHub app pods",
+                                    "default": false
+                                },
+                                "minReplicas": {
+                                    "type": "string",
+                                    "description": "Minimum number of replicas",
+                                    "default": ""
+                                },
+                                "maxReplicas": {
+                                    "type": "string",
+                                    "description": "Maximum number of replicas",
+                                    "default": ""
+                                },
+                                "targetCPU": {
+                                    "type": "string",
+                                    "description": "Target CPU utilization percentage",
+                                    "default": ""
+                                },
+                                "targetMemory": {
+                                    "type": "string",
+                                    "description": "Target Memory utilization percentage",
+                                    "default": ""
+                                }
+                            }
+                        }
+                    }
+                },
+                "serviceAccount": {
+                    "type": "object",
+                    "properties": {
+                        "create": {
+                            "type": "boolean",
+                            "description": "Specifies whether a ServiceAccount should be created",
+                            "default": true
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "The name of the ServiceAccount to use.",
+                            "default": ""
+                        },
+                        "annotations": {
+                            "type": "object",
+                            "description": "Additional Service Account annotations (evaluated as a template)",
+                            "default": {}
+                        },
+                        "automountServiceAccountToken": {
+                            "type": "boolean",
+                            "description": "Automount service account token for the server service account",
+                            "default": true
+                        }
+                    }
+                },
+                "rbac": {
+                    "type": "object",
+                    "properties": {
+                        "create": {
+                            "type": "boolean",
+                            "description": "Specifies whether RBAC resources should be created",
+                            "default": false
+                        },
+                        "rules": {
+                            "type": "array",
+                            "description": "Custom RBAC rules to set",
+                            "default": [],
+                            "items": {}
+                        }
+                    }
+                },
+                "service": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "description": "VyHub app service type",
+                            "default": "ClusterIP"
+                        },
+                        "ports": {
+                            "type": "object",
+                            "properties": {
+                                "http": {
+                                    "type": "number",
+                                    "description": "VyHub app service HTTP port",
+                                    "default": 5050
+                                }
+                            }
+                        },
+                        "nodePorts": {
+                            "type": "object",
+                            "properties": {
+                                "http": {
+                                    "type": "string",
+                                    "description": "Node port for HTTP",
+                                    "default": ""
+                                }
+                            }
+                        },
+                        "clusterIP": {
+                            "type": "string",
+                            "description": "VyHub app service Cluster IP",
+                            "default": ""
+                        },
+                        "loadBalancerIP": {
+                            "type": "string",
+                            "description": "VyHub app service Load Balancer IP",
+                            "default": ""
+                        },
+                        "loadBalancerSourceRanges": {
+                            "type": "array",
+                            "description": "VyHub app service Load Balancer sources",
+                            "default": [],
+                            "items": {}
+                        },
+                        "externalTrafficPolicy": {
+                            "type": "string",
+                            "description": "VyHub app service external traffic policy",
+                            "default": "Cluster"
+                        },
+                        "annotations": {
+                            "type": "object",
+                            "description": "Additional custom annotations for VyHub app service",
+                            "default": {}
+                        },
+                        "extraPorts": {
+                            "type": "array",
+                            "description": "Extra ports to expose in VyHub app service (normally used with the `sidecars` value)",
+                            "default": [],
+                            "items": {}
+                        },
+                        "sessionAffinity": {
+                            "type": "string",
+                            "description": "Control where client requests go, to the same pod or round-robin",
+                            "default": "None"
+                        },
+                        "sessionAffinityConfig": {
+                            "type": "object",
+                            "description": "Additional settings for the sessionAffinity",
+                            "default": {}
+                        }
+                    }
+                },
+                "existingSecret": {
+                    "type": "string",
+                    "description": "Existing secret for app",
+                    "default": ""
+                },
+                "config": {
+                    "type": "object",
+                    "properties": {
+                        "baseUrl": {
+                            "type": "string",
+                            "description": "The URL to the API (without /v1)",
+                            "default": "http://vyhub.local"
+                        },
+                        "rootPath": {
+                            "type": "string",
+                            "description": "When a reverse proxy with path stripping is used, set this to the stripped path. For example /api.",
+                            "default": ""
+                        },
+                        "pathPrefix": {
+                            "type": "string",
+                            "description": "When a reverse proxy without path stripping is used, set this to path of the application. For example /api.",
+                            "default": "/api"
+                        },
+                        "frontendUrl": {
+                            "type": "string",
+                            "description": "The URL where the Frontend is located",
+                            "default": ""
+                        },
+                        "backendUrl": {
+                            "type": "string",
+                            "description": "The URL to the API (with /v1)",
+                            "default": ""
+                        },
+                        "instanceId": {
+                            "type": "string",
+                            "description": "The VyHub instance ID",
+                            "default": ""
+                        },
+                        "instanceUid": {
+                            "type": "string",
+                            "description": "The VyHub instance UID",
+                            "default": ""
+                        },
+                        "addons": {
+                            "type": "array",
+                            "description": "A list of enabled addons. Example: [forum, addon2, addon3]",
+                            "default": [],
+                            "items": {}
+                        },
+                        "customFrontend": {
+                            "type": "boolean",
+                            "description": "If enabled, the web folder stays untouched and frontend files must be supplied manually",
+                            "default": false
+                        },
+                        "cryptSecret": {
+                            "type": "string",
+                            "description": "A random string with at least 32 chars",
+                            "default": ""
+                        },
+                        "sessionSecret": {
+                            "type": "string",
+                            "description": "A random string with at least 32 chars",
+                            "default": ""
+                        },
+                        "server": {
+                            "type": "object",
+                            "properties": {
+                                "debug": {
+                                    "type": "boolean",
+                                    "description": "Enables debug mode which causes stack traces to be printed. Should be false in production.",
+                                    "default": false
+                                },
+                                "echo": {
+                                    "type": "boolean",
+                                    "description": "Enables output of all SQL queries (to stdout)",
+                                    "default": false
+                                },
+                                "secure": {
+                                    "type": "boolean",
+                                    "description": "Enables HTTPS for the application. Not required with a reverse proxy (nginx).",
+                                    "default": false
+                                },
+                                "genCert": {
+                                    "type": "boolean",
+                                    "description": "Generates self-signed TLS certificates on startup for HTTPS",
+                                    "default": false
+                                },
+                                "port": {
+                                    "type": "number",
+                                    "description": "Specifies on which port the application listens",
+                                    "default": 5050
+                                },
+                                "workers": {
+                                    "type": "number",
+                                    "description": "Specifies how many processes of the application are running.",
+                                    "default": 1
+                                }
+                            }
+                        },
+                        "database": {
+                            "type": "object",
+                            "properties": {
+                                "schema": {
+                                    "type": "string",
+                                    "description": "The used postgres schema",
+                                    "default": "public"
+                                },
+                                "maxWait": {
+                                    "type": "number",
+                                    "description": "The maximum amount of seconds the application wait for the database to become available",
+                                    "default": 30
+                                },
+                                "poolSize": {
+                                    "type": "number",
+                                    "description": "The amount of connections that application always maintains to the database",
+                                    "default": 5
+                                },
+                                "poolOverflow": {
+                                    "type": "number",
+                                    "description": "The maximum amount of connections that the application can establish additionally to the pool size. These connections will be closed if not needed anymore.",
+                                    "default": 20
+                                }
+                            }
+                        },
+                        "logging": {
+                            "type": "object",
+                            "properties": {
+                                "lokiUrl": {
+                                    "type": "string",
+                                    "description": "The URL to the Loki logging server",
+                                    "default": ""
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "frontend": {
+            "type": "object",
+            "properties": {
+                "image": {
+                    "type": "object",
+                    "properties": {
+                        "registry": {
+                            "type": "string",
+                            "description": "VyHub frontend image registry",
+                            "default": "registry-1.docker.io"
+                        },
+                        "repository": {
+                            "type": "string",
+                            "description": "VyHub frontend image repository",
+                            "default": "nginxinc/nginx-unprivileged"
+                        },
+                        "digest": {
+                            "type": "string",
+                            "description": "VyHub frontend image digest in the way sha256:aa.... Please note this parameter, if set, will override the tag image tag (immutable tags are recommended)",
+                            "default": ""
+                        },
+                        "pullPolicy": {
+                            "type": "string",
+                            "description": "VyHub frontend image pull policy",
+                            "default": "IfNotPresent"
+                        },
+                        "pullSecrets": {
+                            "type": "array",
+                            "description": "VyHub frontend image pull secrets",
+                            "default": [],
+                            "items": {}
+                        },
+                        "debug": {
+                            "type": "boolean",
+                            "description": "Enable VyHub frontend image debug mode",
+                            "default": false
+                        }
+                    }
+                },
+                "containerPorts": {
+                    "type": "object",
+                    "properties": {
+                        "http": {
+                            "type": "number",
+                            "description": "VyHub frontend HTTP container port",
+                            "default": 8080
+                        }
+                    }
+                },
+                "extraContainerPorts": {
+                    "type": "array",
+                    "description": "Optionally specify extra list of additional ports for VyHub frontend containers",
+                    "default": [],
+                    "items": {}
+                },
+                "livenessProbe": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable livenessProbe on VyHub frontend containers",
+                            "default": true
+                        },
+                        "initialDelaySeconds": {
+                            "type": "number",
+                            "description": "Initial delay seconds for livenessProbe",
+                            "default": 30
+                        },
+                        "periodSeconds": {
+                            "type": "number",
+                            "description": "Period seconds for livenessProbe",
+                            "default": 15
+                        },
+                        "timeoutSeconds": {
+                            "type": "number",
+                            "description": "Timeout seconds for livenessProbe",
+                            "default": 5
+                        },
+                        "failureThreshold": {
+                            "type": "number",
+                            "description": "Failure threshold for livenessProbe",
+                            "default": 3
+                        },
+                        "successThreshold": {
+                            "type": "number",
+                            "description": "Success threshold for livenessProbe",
+                            "default": 1
+                        }
+                    }
+                },
+                "readinessProbe": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable readinessProbe on VyHub frontend containers",
+                            "default": true
+                        },
+                        "initialDelaySeconds": {
+                            "type": "number",
+                            "description": "Initial delay seconds for readinessProbe",
+                            "default": 5
+                        },
+                        "periodSeconds": {
+                            "type": "number",
+                            "description": "Period seconds for readinessProbe",
+                            "default": 10
+                        },
+                        "timeoutSeconds": {
+                            "type": "number",
+                            "description": "Timeout seconds for readinessProbe",
+                            "default": 3
+                        },
+                        "failureThreshold": {
+                            "type": "number",
+                            "description": "Failure threshold for readinessProbe",
+                            "default": 3
+                        },
+                        "successThreshold": {
+                            "type": "number",
+                            "description": "Success threshold for readinessProbe",
+                            "default": 1
+                        }
+                    }
+                },
+                "startupProbe": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable startupProbe on VyHub frontend containers",
+                            "default": true
+                        },
+                        "initialDelaySeconds": {
+                            "type": "number",
+                            "description": "Initial delay seconds for startupProbe",
+                            "default": 0
+                        },
+                        "periodSeconds": {
+                            "type": "number",
+                            "description": "Period seconds for startupProbe",
+                            "default": 5
+                        },
+                        "timeoutSeconds": {
+                            "type": "number",
+                            "description": "Timeout seconds for startupProbe",
+                            "default": 5
+                        },
+                        "failureThreshold": {
+                            "type": "number",
+                            "description": "Failure threshold for startupProbe",
+                            "default": 30
+                        },
+                        "successThreshold": {
+                            "type": "number",
+                            "description": "Success threshold for startupProbe",
+                            "default": 1
+                        }
+                    }
+                },
+                "customLivenessProbe": {
+                    "type": "object",
+                    "description": "Custom livenessProbe that overrides the default one",
+                    "default": {}
+                },
+                "customReadinessProbe": {
+                    "type": "object",
+                    "description": "Custom readinessProbe that overrides the default one",
+                    "default": {}
+                },
+                "customStartupProbe": {
+                    "type": "object",
+                    "description": "Custom startupProbe that overrides the default one",
+                    "default": {}
+                },
+                "resourcesPreset": {
+                    "type": "string",
+                    "description": "Set VyHub frontend container resources according to one common preset (allowed values: none, nano, small, medium, large, xlarge, 2xlarge). This is ignored if frontend.resources is set (frontend.resources is recommended for production).",
+                    "default": "nano"
+                },
+                "resources": {
+                    "type": "object",
+                    "description": "Set VyHub frontend container requests and limits for different resources like CPU or memory (essential for production workloads)",
+                    "default": {}
+                },
+                "containerSecurityContext": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enabled VyHub frontend container' Security Context",
+                            "default": true
+                        },
+                        "runAsUser": {
+                            "type": "number",
+                            "description": "Set runAsUser in VyHub frontend container' Security Context",
+                            "default": 1001
+                        },
+                        "runAsGroup": {
+                            "type": "number",
+                            "description": "Set runAsGroup in VyHub frontend container' Security Context",
+                            "default": 1001
+                        },
+                        "runAsNonRoot": {
+                            "type": "boolean",
+                            "description": "Set runAsNonRoot in VyHub frontend container' Security Context",
+                            "default": true
+                        },
+                        "readOnlyRootFilesystem": {
+                            "type": "boolean",
+                            "description": "Set readOnlyRootFilesystem in VyHub frontend container' Security Context",
+                            "default": true
+                        },
+                        "privileged": {
+                            "type": "boolean",
+                            "description": "Set privileged in VyHub frontend container' Security Context",
+                            "default": false
+                        },
+                        "allowPrivilegeEscalation": {
+                            "type": "boolean",
+                            "description": "Set allowPrivilegeEscalation in VyHub frontend container' Security Context",
+                            "default": false
+                        },
+                        "capabilities": {
+                            "type": "object",
+                            "properties": {
+                                "drop": {
+                                    "type": "array",
+                                    "description": "List of capabilities to be dropped in VyHub frontend container",
+                                    "default": [
+                                        "ALL"
+                                    ],
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        },
+                        "seccompProfile": {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "description": "Set seccomp profile in VyHub frontend container",
+                                    "default": "RuntimeDefault"
+                                }
+                            }
+                        }
+                    }
+                },
+                "command": {
+                    "type": "array",
+                    "description": "Override default VyHub frontend container command (useful when using custom images)",
+                    "default": [],
+                    "items": {}
+                },
+                "args": {
+                    "type": "array",
+                    "description": "Override default VyHub frontend container args (useful when using custom images)",
+                    "default": [],
+                    "items": {}
+                },
+                "lifecycleHooks": {
+                    "type": "object",
+                    "description": "for VyHub frontend containers to automate configuration before or after startup",
+                    "default": {}
+                },
+                "extraEnvVars": {
+                    "type": "array",
+                    "description": "Array with extra environment variables to add to VyHub frontend containers",
+                    "default": [],
+                    "items": {}
+                },
+                "extraEnvVarsCM": {
+                    "type": "string",
+                    "description": "Name of existing ConfigMap containing extra env vars for VyHub frontend containers",
+                    "default": ""
+                },
+                "extraEnvVarsSecret": {
+                    "type": "string",
+                    "description": "Name of existing Secret containing extra env vars for VyHub frontend containers",
+                    "default": ""
+                },
+                "extraVolumes": {
+                    "type": "array",
+                    "description": "Optionally specify extra list of additional volumes for the VyHub frontend pods",
+                    "default": [],
+                    "items": {}
+                },
+                "extraVolumeMounts": {
+                    "type": "array",
+                    "description": "Optionally specify extra list of additional volumeMounts for the VyHub frontend containers",
+                    "default": [],
+                    "items": {}
+                },
+                "service": {
+                    "type": "object",
+                    "properties": {
+                        "ports": {
+                            "type": "object",
+                            "properties": {
+                                "http": {
+                                    "type": "number",
+                                    "description": "VyHub frontend service HTTP port",
+                                    "default": 8080
+                                }
+                            }
+                        },
+                        "nodePorts": {
+                            "type": "object",
+                            "properties": {
+                                "http": {
+                                    "type": "string",
+                                    "description": "Node port for HTTP",
+                                    "default": ""
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "geoipApi": {
+            "type": "object",
+            "properties": {
+                "image": {
+                    "type": "object",
+                    "properties": {
+                        "registry": {
+                            "type": "string",
+                            "description": "VyHub geoipApi image registry",
+                            "default": "registry-1.docker.io"
+                        },
+                        "repository": {
+                            "type": "string",
+                            "description": "VyHub geoipApi image repository",
+                            "default": "observabilitystack/geoip-api"
+                        },
+                        "digest": {
+                            "type": "string",
+                            "description": "VyHub geoipApi image digest in the way sha256:aa.... Please note this parameter, if set, will override the tag image tag (immutable tags are recommended)",
+                            "default": ""
+                        },
+                        "pullPolicy": {
+                            "type": "string",
+                            "description": "VyHub geoipApi image pull policy",
+                            "default": "IfNotPresent"
+                        },
+                        "pullSecrets": {
+                            "type": "array",
+                            "description": "VyHub geoipApi image pull secrets",
+                            "default": [],
+                            "items": {}
+                        },
+                        "debug": {
+                            "type": "boolean",
+                            "description": "Enable VyHub geoipApi image debug mode",
+                            "default": false
+                        }
+                    }
+                },
+                "replicaCount": {
+                    "type": "number",
+                    "description": "Number of VyHub geoipApi replicas to deploy",
+                    "default": 1
+                },
+                "containerPorts": {
+                    "type": "object",
+                    "properties": {
+                        "http": {
+                            "type": "number",
+                            "description": "VyHub geoipApi HTTP container port",
+                            "default": 8080
+                        }
+                    }
+                },
+                "extraContainerPorts": {
+                    "type": "array",
+                    "description": "Optionally specify extra list of additional ports for VyHub geoipApi containers",
+                    "default": [],
+                    "items": {}
+                },
+                "livenessProbe": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable livenessProbe on VyHub geoipApi containers",
+                            "default": true
+                        },
+                        "initialDelaySeconds": {
+                            "type": "number",
+                            "description": "Initial delay seconds for livenessProbe",
+                            "default": 10
+                        },
+                        "periodSeconds": {
+                            "type": "number",
+                            "description": "Period seconds for livenessProbe",
+                            "default": 15
+                        },
+                        "timeoutSeconds": {
+                            "type": "number",
+                            "description": "Timeout seconds for livenessProbe",
+                            "default": 5
+                        },
+                        "failureThreshold": {
+                            "type": "number",
+                            "description": "Failure threshold for livenessProbe",
+                            "default": 3
+                        },
+                        "successThreshold": {
+                            "type": "number",
+                            "description": "Success threshold for livenessProbe",
+                            "default": 1
+                        }
+                    }
+                },
+                "readinessProbe": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable readinessProbe on VyHub geoipApi containers",
+                            "default": true
+                        },
+                        "initialDelaySeconds": {
+                            "type": "number",
+                            "description": "Initial delay seconds for readinessProbe",
+                            "default": 5
+                        },
+                        "periodSeconds": {
+                            "type": "number",
+                            "description": "Period seconds for readinessProbe",
+                            "default": 10
+                        },
+                        "timeoutSeconds": {
+                            "type": "number",
+                            "description": "Timeout seconds for readinessProbe",
+                            "default": 3
+                        },
+                        "failureThreshold": {
+                            "type": "number",
+                            "description": "Failure threshold for readinessProbe",
+                            "default": 3
+                        },
+                        "successThreshold": {
+                            "type": "number",
+                            "description": "Success threshold for readinessProbe",
+                            "default": 1
+                        }
+                    }
+                },
+                "startupProbe": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable startupProbe on VyHub geoipApi containers",
+                            "default": true
+                        },
+                        "initialDelaySeconds": {
+                            "type": "number",
+                            "description": "Initial delay seconds for startupProbe",
+                            "default": 0
+                        },
+                        "periodSeconds": {
+                            "type": "number",
+                            "description": "Period seconds for startupProbe",
+                            "default": 5
+                        },
+                        "timeoutSeconds": {
+                            "type": "number",
+                            "description": "Timeout seconds for startupProbe",
+                            "default": 5
+                        },
+                        "failureThreshold": {
+                            "type": "number",
+                            "description": "Failure threshold for startupProbe",
+                            "default": 30
+                        },
+                        "successThreshold": {
+                            "type": "number",
+                            "description": "Success threshold for startupProbe",
+                            "default": 1
+                        }
+                    }
+                },
+                "customLivenessProbe": {
+                    "type": "object",
+                    "description": "Custom livenessProbe that overrides the default one",
+                    "default": {}
+                },
+                "customReadinessProbe": {
+                    "type": "object",
+                    "description": "Custom readinessProbe that overrides the default one",
+                    "default": {}
+                },
+                "customStartupProbe": {
+                    "type": "object",
+                    "description": "Custom startupProbe that overrides the default one",
+                    "default": {}
+                },
+                "resourcesPreset": {
+                    "type": "string",
+                    "description": "Set VyHub geoipApi container resources according to one common preset (allowed values: none, nano, small, medium, large, xlarge, 2xlarge). This is ignored if geoipApi.resources is set (geoipApi.resources is recommended for production).",
+                    "default": "nano"
+                },
+                "resources": {
+                    "type": "object",
+                    "description": "Set VyHub geoipApi container requests and limits for different resources like CPU or memory (essential for production workloads)",
+                    "default": {}
+                },
+                "podSecurityContext": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable VyHub geoipApi pods' Security Context",
+                            "default": true
+                        },
+                        "fsGroupChangePolicy": {
+                            "type": "string",
+                            "description": "Set filesystem group change policy for VyHub geoipApi pods",
+                            "default": "Always"
+                        },
+                        "sysctls": {
+                            "type": "array",
+                            "description": "Set kernel settings using the sysctl interface for VyHub geoipApi pods",
+                            "default": [],
+                            "items": {}
+                        },
+                        "supplementalGroups": {
+                            "type": "array",
+                            "description": "Set filesystem extra groups for VyHub geoipApi pods",
+                            "default": [],
+                            "items": {}
+                        },
+                        "fsGroup": {
+                            "type": "number",
+                            "description": "Set fsGroup in VyHub geoipApi pods' Security Context",
+                            "default": 1001
+                        }
+                    }
+                },
+                "containerSecurityContext": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enabled VyHub geoipApi container' Security Context",
+                            "default": true
+                        },
+                        "runAsUser": {
+                            "type": "number",
+                            "description": "Set runAsUser in VyHub geoipApi container' Security Context",
+                            "default": 1001
+                        },
+                        "runAsGroup": {
+                            "type": "number",
+                            "description": "Set runAsGroup in VyHub geoipApi container' Security Context",
+                            "default": 1001
+                        },
+                        "runAsNonRoot": {
+                            "type": "boolean",
+                            "description": "Set runAsNonRoot in VyHub geoipApi container' Security Context",
+                            "default": true
+                        },
+                        "readOnlyRootFilesystem": {
+                            "type": "boolean",
+                            "description": "Set readOnlyRootFilesystem in VyHub geoipApi container' Security Context",
+                            "default": true
+                        },
+                        "privileged": {
+                            "type": "boolean",
+                            "description": "Set privileged in VyHub geoipApi container' Security Context",
+                            "default": false
+                        },
+                        "allowPrivilegeEscalation": {
+                            "type": "boolean",
+                            "description": "Set allowPrivilegeEscalation in VyHub geoipApi container' Security Context",
+                            "default": false
+                        },
+                        "capabilities": {
+                            "type": "object",
+                            "properties": {
+                                "drop": {
+                                    "type": "array",
+                                    "description": "List of capabilities to be dropped in VyHub geoipApi container",
+                                    "default": [
+                                        "ALL"
+                                    ],
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        },
+                        "seccompProfile": {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "description": "Set seccomp profile in VyHub geoipApi container",
+                                    "default": "RuntimeDefault"
+                                }
+                            }
+                        }
+                    }
+                },
+                "command": {
+                    "type": "array",
+                    "description": "Override default VyHub geoipApi container command (useful when using custom images)",
+                    "default": [],
+                    "items": {}
+                },
+                "args": {
+                    "type": "array",
+                    "description": "Override default VyHub geoipApi container args (useful when using custom images)",
+                    "default": [],
+                    "items": {}
+                },
+                "automountServiceAccountToken": {
+                    "type": "boolean",
+                    "description": "Mount Service Account token in VyHub geoipApi pods",
+                    "default": false
+                },
+                "hostAliases": {
+                    "type": "array",
+                    "description": "VyHub geoipApi pods host aliases",
+                    "default": [],
+                    "items": {}
+                },
+                "daemonsetAnnotations": {
+                    "type": "object",
+                    "description": "Annotations for VyHub geoipApi daemonset",
+                    "default": {}
+                },
+                "deploymentAnnotations": {
+                    "type": "object",
+                    "description": "Annotations for VyHub geoipApi deployment",
+                    "default": {}
+                },
+                "statefulsetAnnotations": {
+                    "type": "object",
+                    "description": "Annotations for VyHub geoipApi statefulset",
+                    "default": {}
+                },
+                "podLabels": {
+                    "type": "object",
+                    "description": "Extra labels for VyHub geoipApi pods",
+                    "default": {}
+                },
+                "podAnnotations": {
+                    "type": "object",
+                    "description": "Annotations for VyHub geoipApi pods",
+                    "default": {}
+                },
+                "podAffinityPreset": {
+                    "type": "string",
+                    "description": "Pod affinity preset. Ignored if `geoipApi.affinity` is set. Allowed values: `soft` or `hard`",
+                    "default": ""
+                },
+                "podAntiAffinityPreset": {
+                    "type": "string",
+                    "description": "Pod anti-affinity preset. Ignored if `geoipApi.affinity` is set. Allowed values: `soft` or `hard`",
+                    "default": "soft"
+                },
+                "nodeAffinityPreset": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "description": "Node affinity preset type. Ignored if `geoipApi.affinity` is set. Allowed values: `soft` or `hard`",
+                            "default": ""
+                        },
+                        "key": {
+                            "type": "string",
+                            "description": "Node label key to match. Ignored if `geoipApi.affinity` is set",
+                            "default": ""
+                        },
+                        "values": {
+                            "type": "array",
+                            "description": "Node label values to match. Ignored if `geoipApi.affinity` is set",
+                            "default": [],
+                            "items": {}
+                        }
+                    }
+                },
+                "affinity": {
+                    "type": "object",
+                    "description": "Affinity for VyHub geoipApi pods assignment",
+                    "default": {}
+                },
+                "nodeSelector": {
+                    "type": "object",
+                    "description": "Node labels for VyHub geoipApi pods assignment",
+                    "default": {}
+                },
+                "tolerations": {
+                    "type": "array",
+                    "description": "Tolerations for VyHub geoipApi pods assignment",
+                    "default": [],
+                    "items": {}
+                },
+                "updateStrategy": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "description": "VyHub geoipApi deployment strategy type",
+                            "default": "RollingUpdate"
+                        }
+                    }
+                },
+                "priorityClassName": {
+                    "type": "string",
+                    "description": "VyHub geoipApi pods' priorityClassName",
+                    "default": ""
+                },
+                "topologySpreadConstraints": {
+                    "type": "array",
+                    "description": "Topology Spread Constraints for VyHub geoipApi pod assignment spread across your cluster among failure-domains",
+                    "default": [],
+                    "items": {}
+                },
+                "schedulerName": {
+                    "type": "string",
+                    "description": "Name of the k8s scheduler (other than default) for VyHub geoipApi pods",
+                    "default": ""
+                },
+                "terminationGracePeriodSeconds": {
+                    "type": "string",
+                    "description": "Seconds VyHub geoipApi pods need to terminate gracefully",
+                    "default": ""
+                },
+                "lifecycleHooks": {
+                    "type": "object",
+                    "description": "for VyHub geoipApi containers to automate configuration before or after startup",
+                    "default": {}
+                },
+                "extraEnvVars": {
+                    "type": "array",
+                    "description": "Array with extra environment variables to add to VyHub geoipApi containers",
+                    "default": [],
+                    "items": {}
+                },
+                "extraEnvVarsCM": {
+                    "type": "string",
+                    "description": "Name of existing ConfigMap containing extra env vars for VyHub geoipApi containers",
+                    "default": ""
+                },
+                "extraEnvVarsSecret": {
+                    "type": "string",
+                    "description": "Name of existing Secret containing extra env vars for VyHub geoipApi containers",
+                    "default": ""
+                },
+                "extraVolumes": {
+                    "type": "array",
+                    "description": "Optionally specify extra list of additional volumes for the VyHub geoipApi pods",
+                    "default": [],
+                    "items": {}
+                },
+                "extraVolumeMounts": {
+                    "type": "array",
+                    "description": "Optionally specify extra list of additional volumeMounts for the VyHub geoipApi containers",
+                    "default": [],
+                    "items": {}
+                },
+                "sidecars": {
+                    "type": "array",
+                    "description": "Add additional sidecar containers to the VyHub geoipApi pods",
+                    "default": [],
+                    "items": {}
+                },
+                "initContainers": {
+                    "type": "array",
+                    "description": "Add additional init containers to the VyHub geoipApi pods",
+                    "default": [],
+                    "items": {}
+                },
+                "pdb": {
+                    "type": "object",
+                    "properties": {
+                        "create": {
+                            "type": "boolean",
+                            "description": "Enable/disable a Pod Disruption Budget creation",
+                            "default": true
+                        },
+                        "minAvailable": {
+                            "type": "string",
+                            "description": "Minimum number/percentage of pods that should remain scheduled",
+                            "default": ""
+                        },
+                        "maxUnavailable": {
+                            "type": "string",
+                            "description": "Maximum number/percentage of pods that may be made unavailable. Defaults to `1` if both `geoipApi.pdb.minAvailable` and `geoipApi.pdb.maxUnavailable` are empty.",
+                            "default": ""
+                        }
+                    }
+                },
+                "autoscaling": {
+                    "type": "object",
+                    "properties": {
+                        "vpa": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean",
+                                    "description": "Enable VPA for VyHub geoipApi pods",
+                                    "default": false
+                                },
+                                "annotations": {
+                                    "type": "object",
+                                    "description": "Annotations for VPA resource",
+                                    "default": {}
+                                },
+                                "controlledResources": {
+                                    "type": "array",
+                                    "description": "VPA List of resources that the vertical pod autoscaler can control. Defaults to cpu and memory",
+                                    "default": [],
+                                    "items": {}
+                                },
+                                "maxAllowed": {
+                                    "type": "object",
+                                    "description": "VPA Max allowed resources for the pod",
+                                    "default": {}
+                                },
+                                "minAllowed": {
+                                    "type": "object",
+                                    "description": "VPA Min allowed resources for the pod",
+                                    "default": {}
+                                },
+                                "updatePolicy": {
+                                    "type": "object",
+                                    "properties": {
+                                        "updateMode": {
+                                            "type": "string",
+                                            "description": "Autoscaling update policy",
+                                            "default": "Auto"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "hpa": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean",
+                                    "description": "Enable HPA for VyHub geoipApi pods",
+                                    "default": false
+                                },
+                                "minReplicas": {
+                                    "type": "string",
+                                    "description": "Minimum number of replicas",
+                                    "default": ""
+                                },
+                                "maxReplicas": {
+                                    "type": "string",
+                                    "description": "Maximum number of replicas",
+                                    "default": ""
+                                },
+                                "targetCPU": {
+                                    "type": "string",
+                                    "description": "Target CPU utilization percentage",
+                                    "default": ""
+                                },
+                                "targetMemory": {
+                                    "type": "string",
+                                    "description": "Target Memory utilization percentage",
+                                    "default": ""
+                                }
+                            }
+                        }
+                    }
+                },
+                "serviceAccount": {
+                    "type": "object",
+                    "properties": {
+                        "create": {
+                            "type": "boolean",
+                            "description": "Specifies whether a ServiceAccount should be created",
+                            "default": true
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "The name of the ServiceAccount to use.",
+                            "default": ""
+                        },
+                        "annotations": {
+                            "type": "object",
+                            "description": "Additional Service Account annotations (evaluated as a template)",
+                            "default": {}
+                        },
+                        "automountServiceAccountToken": {
+                            "type": "boolean",
+                            "description": "Automount service account token for the server service account",
+                            "default": true
+                        }
+                    }
+                },
+                "rbac": {
+                    "type": "object",
+                    "properties": {
+                        "create": {
+                            "type": "boolean",
+                            "description": "Specifies whether RBAC resources should be created",
+                            "default": false
+                        },
+                        "rules": {
+                            "type": "array",
+                            "description": "Custom RBAC rules to set",
+                            "default": [],
+                            "items": {}
+                        }
+                    }
+                },
+                "service": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "description": "geoipApi frontend service type",
+                            "default": "ClusterIP"
+                        },
+                        "ports": {
+                            "type": "object",
+                            "properties": {
+                                "http": {
+                                    "type": "number",
+                                    "description": "geoipApi frontend service HTTP port",
+                                    "default": 8080
+                                }
+                            }
+                        },
+                        "nodePorts": {
+                            "type": "object",
+                            "properties": {
+                                "http": {
+                                    "type": "string",
+                                    "description": "Node port for HTTP",
+                                    "default": ""
+                                }
+                            }
+                        },
+                        "clusterIP": {
+                            "type": "string",
+                            "description": "VyHub geoipApi service Cluster IP",
+                            "default": ""
+                        },
+                        "loadBalancerIP": {
+                            "type": "string",
+                            "description": "VyHub geoipApi service Load Balancer IP",
+                            "default": ""
+                        },
+                        "loadBalancerSourceRanges": {
+                            "type": "array",
+                            "description": "VyHub geoipApi service Load Balancer sources",
+                            "default": [],
+                            "items": {}
+                        },
+                        "externalTrafficPolicy": {
+                            "type": "string",
+                            "description": "VyHub geoipApi service external traffic policy",
+                            "default": "Cluster"
+                        },
+                        "annotations": {
+                            "type": "object",
+                            "description": "Additional custom annotations for VyHub geoipApi service",
+                            "default": {}
+                        },
+                        "extraPorts": {
+                            "type": "array",
+                            "description": "Extra ports to expose in VyHub geoipApi service (normally used with the `sidecars` value)",
+                            "default": [],
+                            "items": {}
+                        },
+                        "sessionAffinity": {
+                            "type": "string",
+                            "description": "Control where client requests go, to the same pod or round-robin",
+                            "default": "None"
+                        },
+                        "sessionAffinityConfig": {
+                            "type": "object",
+                            "description": "Additional settings for the sessionAffinity",
+                            "default": {}
+                        }
+                    }
+                }
+            }
+        },
+        "pdfApi": {
+            "type": "object",
+            "properties": {
+                "image": {
+                    "type": "object",
+                    "properties": {
+                        "registry": {
+                            "type": "string",
+                            "description": "VyHub pdfApi image registry",
+                            "default": "ghcr.io"
+                        },
+                        "repository": {
+                            "type": "string",
+                            "description": "VyHub pdfApi image repository",
+                            "default": "matbyte-com/htmltopdf-api"
+                        },
+                        "digest": {
+                            "type": "string",
+                            "description": "VyHub pdfApi image digest in the way sha256:aa.... Please note this parameter, if set, will override the tag image tag (immutable tags are recommended)",
+                            "default": ""
+                        },
+                        "pullPolicy": {
+                            "type": "string",
+                            "description": "VyHub pdfApi image pull policy",
+                            "default": "IfNotPresent"
+                        },
+                        "pullSecrets": {
+                            "type": "array",
+                            "description": "VyHub pdfApi image pull secrets",
+                            "default": [],
+                            "items": {}
+                        },
+                        "debug": {
+                            "type": "boolean",
+                            "description": "Enable VyHub pdfApi image debug mode",
+                            "default": false
+                        }
+                    }
+                },
+                "replicaCount": {
+                    "type": "number",
+                    "description": "Number of VyHub pdfApi replicas to deploy",
+                    "default": 1
+                },
+                "containerPorts": {
+                    "type": "object",
+                    "properties": {
+                        "http": {
+                            "type": "number",
+                            "description": "VyHub pdfApi HTTP container port",
+                            "default": 9090
+                        }
+                    }
+                },
+                "extraContainerPorts": {
+                    "type": "array",
+                    "description": "Optionally specify extra list of additional ports for VyHub pdfApi containers",
+                    "default": [],
+                    "items": {}
+                },
+                "livenessProbe": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable livenessProbe on VyHub pdfApi containers",
+                            "default": false
+                        },
+                        "initialDelaySeconds": {
+                            "type": "number",
+                            "description": "Initial delay seconds for livenessProbe",
+                            "default": 10
+                        },
+                        "periodSeconds": {
+                            "type": "number",
+                            "description": "Period seconds for livenessProbe",
+                            "default": 15
+                        },
+                        "timeoutSeconds": {
+                            "type": "number",
+                            "description": "Timeout seconds for livenessProbe",
+                            "default": 5
+                        },
+                        "failureThreshold": {
+                            "type": "number",
+                            "description": "Failure threshold for livenessProbe",
+                            "default": 3
+                        },
+                        "successThreshold": {
+                            "type": "number",
+                            "description": "Success threshold for livenessProbe",
+                            "default": 1
+                        }
+                    }
+                },
+                "readinessProbe": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable readinessProbe on VyHub pdfApi containers",
+                            "default": false
+                        },
+                        "initialDelaySeconds": {
+                            "type": "number",
+                            "description": "Initial delay seconds for readinessProbe",
+                            "default": 5
+                        },
+                        "periodSeconds": {
+                            "type": "number",
+                            "description": "Period seconds for readinessProbe",
+                            "default": 10
+                        },
+                        "timeoutSeconds": {
+                            "type": "number",
+                            "description": "Timeout seconds for readinessProbe",
+                            "default": 3
+                        },
+                        "failureThreshold": {
+                            "type": "number",
+                            "description": "Failure threshold for readinessProbe",
+                            "default": 3
+                        },
+                        "successThreshold": {
+                            "type": "number",
+                            "description": "Success threshold for readinessProbe",
+                            "default": 1
+                        }
+                    }
+                },
+                "startupProbe": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable startupProbe on VyHub pdfApi containers",
+                            "default": false
+                        },
+                        "initialDelaySeconds": {
+                            "type": "number",
+                            "description": "Initial delay seconds for startupProbe",
+                            "default": 0
+                        },
+                        "periodSeconds": {
+                            "type": "number",
+                            "description": "Period seconds for startupProbe",
+                            "default": 5
+                        },
+                        "timeoutSeconds": {
+                            "type": "number",
+                            "description": "Timeout seconds for startupProbe",
+                            "default": 5
+                        },
+                        "failureThreshold": {
+                            "type": "number",
+                            "description": "Failure threshold for startupProbe",
+                            "default": 30
+                        },
+                        "successThreshold": {
+                            "type": "number",
+                            "description": "Success threshold for startupProbe",
+                            "default": 1
+                        }
+                    }
+                },
+                "customLivenessProbe": {
+                    "type": "object",
+                    "description": "Custom livenessProbe that overrides the default one",
+                    "default": {}
+                },
+                "customReadinessProbe": {
+                    "type": "object",
+                    "description": "Custom readinessProbe that overrides the default one",
+                    "default": {}
+                },
+                "customStartupProbe": {
+                    "type": "object",
+                    "description": "Custom startupProbe that overrides the default one",
+                    "default": {}
+                },
+                "resourcesPreset": {
+                    "type": "string",
+                    "description": "Set VyHub pdfApi container resources according to one common preset (allowed values: none, nano, small, medium, large, xlarge, 2xlarge). This is ignored if pdfApi.resources is set (pdfApi.resources is recommended for production).",
+                    "default": "nano"
+                },
+                "resources": {
+                    "type": "object",
+                    "description": "Set VyHub pdfApi container requests and limits for different resources like CPU or memory (essential for production workloads)",
+                    "default": {}
+                },
+                "podSecurityContext": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable VyHub pdfApi pods' Security Context",
+                            "default": true
+                        },
+                        "fsGroupChangePolicy": {
+                            "type": "string",
+                            "description": "Set filesystem group change policy for VyHub pdfApi pods",
+                            "default": "Always"
+                        },
+                        "sysctls": {
+                            "type": "array",
+                            "description": "Set kernel settings using the sysctl interface for VyHub pdfApi pods",
+                            "default": [],
+                            "items": {}
+                        },
+                        "supplementalGroups": {
+                            "type": "array",
+                            "description": "Set filesystem extra groups for VyHub pdfApi pods",
+                            "default": [],
+                            "items": {}
+                        },
+                        "fsGroup": {
+                            "type": "number",
+                            "description": "Set fsGroup in VyHub pdfApi pods' Security Context",
+                            "default": 1001
+                        }
+                    }
+                },
+                "containerSecurityContext": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enabled VyHub pdfApi container' Security Context",
+                            "default": true
+                        },
+                        "runAsUser": {
+                            "type": "number",
+                            "description": "Set runAsUser in VyHub pdfApi container' Security Context",
+                            "default": 1001
+                        },
+                        "runAsGroup": {
+                            "type": "number",
+                            "description": "Set runAsGroup in VyHub pdfApi container' Security Context",
+                            "default": 1001
+                        },
+                        "runAsNonRoot": {
+                            "type": "boolean",
+                            "description": "Set runAsNonRoot in VyHub pdfApi container' Security Context",
+                            "default": true
+                        },
+                        "readOnlyRootFilesystem": {
+                            "type": "boolean",
+                            "description": "Set readOnlyRootFilesystem in VyHub pdfApi container' Security Context",
+                            "default": true
+                        },
+                        "privileged": {
+                            "type": "boolean",
+                            "description": "Set privileged in VyHub pdfApi container' Security Context",
+                            "default": false
+                        },
+                        "allowPrivilegeEscalation": {
+                            "type": "boolean",
+                            "description": "Set allowPrivilegeEscalation in VyHub pdfApi container' Security Context",
+                            "default": false
+                        },
+                        "capabilities": {
+                            "type": "object",
+                            "properties": {
+                                "drop": {
+                                    "type": "array",
+                                    "description": "List of capabilities to be dropped in VyHub pdfApi container",
+                                    "default": [
+                                        "ALL"
+                                    ],
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        },
+                        "seccompProfile": {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "description": "Set seccomp profile in VyHub pdfApi container",
+                                    "default": "RuntimeDefault"
+                                }
+                            }
+                        }
+                    }
+                },
+                "command": {
+                    "type": "array",
+                    "description": "Override default VyHub pdfApi container command (useful when using custom images)",
+                    "default": [],
+                    "items": {}
+                },
+                "args": {
+                    "type": "array",
+                    "description": "Override default VyHub pdfApi container args (useful when using custom images)",
+                    "default": [],
+                    "items": {}
+                },
+                "automountServiceAccountToken": {
+                    "type": "boolean",
+                    "description": "Mount Service Account token in VyHub pdfApi pods",
+                    "default": false
+                },
+                "hostAliases": {
+                    "type": "array",
+                    "description": "VyHub pdfApi pods host aliases",
+                    "default": [],
+                    "items": {}
+                },
+                "daemonsetAnnotations": {
+                    "type": "object",
+                    "description": "Annotations for VyHub pdfApi daemonset",
+                    "default": {}
+                },
+                "deploymentAnnotations": {
+                    "type": "object",
+                    "description": "Annotations for VyHub pdfApi deployment",
+                    "default": {}
+                },
+                "statefulsetAnnotations": {
+                    "type": "object",
+                    "description": "Annotations for VyHub pdfApi statefulset",
+                    "default": {}
+                },
+                "podLabels": {
+                    "type": "object",
+                    "description": "Extra labels for VyHub pdfApi pods",
+                    "default": {}
+                },
+                "podAnnotations": {
+                    "type": "object",
+                    "description": "Annotations for VyHub pdfApi pods",
+                    "default": {}
+                },
+                "podAffinityPreset": {
+                    "type": "string",
+                    "description": "Pod affinity preset. Ignored if `pdfApi.affinity` is set. Allowed values: `soft` or `hard`",
+                    "default": ""
+                },
+                "podAntiAffinityPreset": {
+                    "type": "string",
+                    "description": "Pod anti-affinity preset. Ignored if `pdfApi.affinity` is set. Allowed values: `soft` or `hard`",
+                    "default": "soft"
+                },
+                "nodeAffinityPreset": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "description": "Node affinity preset type. Ignored if `pdfApi.affinity` is set. Allowed values: `soft` or `hard`",
+                            "default": ""
+                        },
+                        "key": {
+                            "type": "string",
+                            "description": "Node label key to match. Ignored if `pdfApi.affinity` is set",
+                            "default": ""
+                        },
+                        "values": {
+                            "type": "array",
+                            "description": "Node label values to match. Ignored if `pdfApi.affinity` is set",
+                            "default": [],
+                            "items": {}
+                        }
+                    }
+                },
+                "affinity": {
+                    "type": "object",
+                    "description": "Affinity for VyHub pdfApi pods assignment",
+                    "default": {}
+                },
+                "nodeSelector": {
+                    "type": "object",
+                    "description": "Node labels for VyHub pdfApi pods assignment",
+                    "default": {}
+                },
+                "tolerations": {
+                    "type": "array",
+                    "description": "Tolerations for VyHub pdfApi pods assignment",
+                    "default": [],
+                    "items": {}
+                },
+                "updateStrategy": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "description": "VyHub pdfApi deployment strategy type",
+                            "default": "RollingUpdate"
+                        }
+                    }
+                },
+                "priorityClassName": {
+                    "type": "string",
+                    "description": "VyHub pdfApi pods' priorityClassName",
+                    "default": ""
+                },
+                "topologySpreadConstraints": {
+                    "type": "array",
+                    "description": "Topology Spread Constraints for VyHub pdfApi pod assignment spread across your cluster among failure-domains",
+                    "default": [],
+                    "items": {}
+                },
+                "schedulerName": {
+                    "type": "string",
+                    "description": "Name of the k8s scheduler (other than default) for VyHub pdfApi pods",
+                    "default": ""
+                },
+                "terminationGracePeriodSeconds": {
+                    "type": "string",
+                    "description": "Seconds VyHub pdfApi pods need to terminate gracefully",
+                    "default": ""
+                },
+                "lifecycleHooks": {
+                    "type": "object",
+                    "description": "for VyHub pdfApi containers to automate configuration before or after startup",
+                    "default": {}
+                },
+                "extraEnvVars": {
+                    "type": "array",
+                    "description": "Array with extra environment variables to add to VyHub pdfApi containers",
+                    "default": [],
+                    "items": {}
+                },
+                "extraEnvVarsCM": {
+                    "type": "string",
+                    "description": "Name of existing ConfigMap containing extra env vars for VyHub pdfApi containers",
+                    "default": ""
+                },
+                "extraEnvVarsSecret": {
+                    "type": "string",
+                    "description": "Name of existing Secret containing extra env vars for VyHub pdfApi containers",
+                    "default": ""
+                },
+                "extraVolumes": {
+                    "type": "array",
+                    "description": "Optionally specify extra list of additional volumes for the VyHub pdfApi pods",
+                    "default": [],
+                    "items": {}
+                },
+                "extraVolumeMounts": {
+                    "type": "array",
+                    "description": "Optionally specify extra list of additional volumeMounts for the VyHub pdfApi containers",
+                    "default": [],
+                    "items": {}
+                },
+                "sidecars": {
+                    "type": "array",
+                    "description": "Add additional sidecar containers to the VyHub pdfApi pods",
+                    "default": [],
+                    "items": {}
+                },
+                "initContainers": {
+                    "type": "array",
+                    "description": "Add additional init containers to the VyHub pdfApi pods",
+                    "default": [],
+                    "items": {}
+                },
+                "pdb": {
+                    "type": "object",
+                    "properties": {
+                        "create": {
+                            "type": "boolean",
+                            "description": "Enable/disable a Pod Disruption Budget creation",
+                            "default": true
+                        },
+                        "minAvailable": {
+                            "type": "string",
+                            "description": "Minimum number/percentage of pods that should remain scheduled",
+                            "default": ""
+                        },
+                        "maxUnavailable": {
+                            "type": "string",
+                            "description": "Maximum number/percentage of pods that may be made unavailable. Defaults to `1` if both `pdfApi.pdb.minAvailable` and `pdfApi.pdb.maxUnavailable` are empty.",
+                            "default": ""
+                        }
+                    }
+                },
+                "autoscaling": {
+                    "type": "object",
+                    "properties": {
+                        "vpa": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean",
+                                    "description": "Enable VPA for VyHub pdfApi pods",
+                                    "default": false
+                                },
+                                "annotations": {
+                                    "type": "object",
+                                    "description": "Annotations for VPA resource",
+                                    "default": {}
+                                },
+                                "controlledResources": {
+                                    "type": "array",
+                                    "description": "VPA List of resources that the vertical pod autoscaler can control. Defaults to cpu and memory",
+                                    "default": [],
+                                    "items": {}
+                                },
+                                "maxAllowed": {
+                                    "type": "object",
+                                    "description": "VPA Max allowed resources for the pod",
+                                    "default": {}
+                                },
+                                "minAllowed": {
+                                    "type": "object",
+                                    "description": "VPA Min allowed resources for the pod",
+                                    "default": {}
+                                },
+                                "updatePolicy": {
+                                    "type": "object",
+                                    "properties": {
+                                        "updateMode": {
+                                            "type": "string",
+                                            "description": "Autoscaling update policy",
+                                            "default": "Auto"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "hpa": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean",
+                                    "description": "Enable HPA for VyHub pdfApi pods",
+                                    "default": false
+                                },
+                                "minReplicas": {
+                                    "type": "string",
+                                    "description": "Minimum number of replicas",
+                                    "default": ""
+                                },
+                                "maxReplicas": {
+                                    "type": "string",
+                                    "description": "Maximum number of replicas",
+                                    "default": ""
+                                },
+                                "targetCPU": {
+                                    "type": "string",
+                                    "description": "Target CPU utilization percentage",
+                                    "default": ""
+                                },
+                                "targetMemory": {
+                                    "type": "string",
+                                    "description": "Target Memory utilization percentage",
+                                    "default": ""
+                                }
+                            }
+                        }
+                    }
+                },
+                "serviceAccount": {
+                    "type": "object",
+                    "properties": {
+                        "create": {
+                            "type": "boolean",
+                            "description": "Specifies whether a ServiceAccount should be created",
+                            "default": true
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "The name of the ServiceAccount to use.",
+                            "default": ""
+                        },
+                        "annotations": {
+                            "type": "object",
+                            "description": "Additional Service Account annotations (evaluated as a template)",
+                            "default": {}
+                        },
+                        "automountServiceAccountToken": {
+                            "type": "boolean",
+                            "description": "Automount service account token for the server service account",
+                            "default": true
+                        }
+                    }
+                },
+                "rbac": {
+                    "type": "object",
+                    "properties": {
+                        "create": {
+                            "type": "boolean",
+                            "description": "Specifies whether RBAC resources should be created",
+                            "default": false
+                        },
+                        "rules": {
+                            "type": "array",
+                            "description": "Custom RBAC rules to set",
+                            "default": [],
+                            "items": {}
+                        }
+                    }
+                },
+                "service": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "description": "VyHub pdfApi service type",
+                            "default": "ClusterIP"
+                        },
+                        "ports": {
+                            "type": "object",
+                            "properties": {
+                                "http": {
+                                    "type": "number",
+                                    "description": "VyHub pdfApi service HTTP port",
+                                    "default": 9090
+                                }
+                            }
+                        },
+                        "nodePorts": {
+                            "type": "object",
+                            "properties": {
+                                "http": {
+                                    "type": "string",
+                                    "description": "Node port for HTTP",
+                                    "default": ""
+                                }
+                            }
+                        },
+                        "clusterIP": {
+                            "type": "string",
+                            "description": "VyHub pdfApi service Cluster IP",
+                            "default": ""
+                        },
+                        "loadBalancerIP": {
+                            "type": "string",
+                            "description": "VyHub pdfApi service Load Balancer IP",
+                            "default": ""
+                        },
+                        "loadBalancerSourceRanges": {
+                            "type": "array",
+                            "description": "VyHub pdfApi service Load Balancer sources",
+                            "default": [],
+                            "items": {}
+                        },
+                        "externalTrafficPolicy": {
+                            "type": "string",
+                            "description": "VyHub pdfApi service external traffic policy",
+                            "default": "Cluster"
+                        },
+                        "annotations": {
+                            "type": "object",
+                            "description": "Additional custom annotations for VyHub pdfApi service",
+                            "default": {}
+                        },
+                        "extraPorts": {
+                            "type": "array",
+                            "description": "Extra ports to expose in VyHub pdfApi service (normally used with the `sidecars` value)",
+                            "default": [],
+                            "items": {}
+                        },
+                        "sessionAffinity": {
+                            "type": "string",
+                            "description": "Control where client requests go, to the same pod or round-robin",
+                            "default": "None"
+                        },
+                        "sessionAffinityConfig": {
+                            "type": "object",
+                            "description": "Additional settings for the sessionAffinity",
+                            "default": {}
+                        }
+                    }
+                }
+            }
+        },
+        "ingress": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable ingress record generation for VyHub",
+                    "default": false
+                },
+                "pathType": {
+                    "type": "string",
+                    "description": "Ingress path type",
+                    "default": "Prefix"
+                },
+                "apiVersion": {
+                    "type": "string",
+                    "description": "Force Ingress API version (automatically detected if not set)",
+                    "default": ""
+                },
+                "hostname": {
+                    "type": "string",
+                    "description": "Default host for the ingress record",
+                    "default": "vyhub.local"
+                },
+                "ingressClassName": {
+                    "type": "string",
+                    "description": "IngressClass that will be be used to implement the Ingress (Kubernetes 1.18+)",
+                    "default": ""
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Ingress path for VyHub frontend",
+                    "default": "/"
+                },
+                "appPath": {
+                    "type": "string",
+                    "description": "Ingress path for VyHub app",
+                    "default": "/api/"
+                },
+                "annotations": {
+                    "type": "object",
+                    "description": "Additional annotations for the Ingress resource. To enable certificate autogeneration, place here your cert-manager annotations.",
+                    "default": {}
+                },
+                "tls": {
+                    "type": "boolean",
+                    "description": "Enable TLS configuration for the host defined at `ingress.hostname` parameter",
+                    "default": false
+                },
+                "selfSigned": {
+                    "type": "boolean",
+                    "description": "Create a TLS secret for this ingress record using self-signed certificates generated by Helm",
+                    "default": false
+                },
+                "extraHosts": {
+                    "type": "array",
+                    "description": "An array with additional hostname(s) to be covered with the ingress record",
+                    "default": [],
+                    "items": {}
+                },
+                "extraPaths": {
+                    "type": "array",
+                    "description": "An array with additional arbitrary paths that may need to be added to the ingress under the main host",
+                    "default": [],
+                    "items": {}
+                },
+                "extraTls": {
+                    "type": "array",
+                    "description": "TLS configuration for additional hostname(s) to be covered with this ingress record",
+                    "default": [],
+                    "items": {}
+                },
+                "secrets": {
+                    "type": "array",
+                    "description": "Custom TLS certificates as secrets",
+                    "default": [],
+                    "items": {}
+                },
+                "extraRules": {
+                    "type": "array",
+                    "description": "Additional rules to be covered with this ingress record",
+                    "default": [],
+                    "items": {}
+                }
+            }
+        },
+        "persistence": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable persistence using Persistent Volume Claims",
+                    "default": false
+                },
+                "web": {
+                    "type": "object",
+                    "properties": {
+                        "existingClaim": {
+                            "type": "string",
+                            "description": "Name of an existing PVC to use",
+                            "default": ""
+                        },
+                        "storageClass": {
+                            "type": "string",
+                            "description": "PVC Storage Class for vyhub-web volume",
+                            "default": ""
+                        },
+                        "subPath": {
+                            "type": "string",
+                            "description": "The sub path used in the volume",
+                            "default": ""
+                        },
+                        "accessModes": {
+                            "type": "array",
+                            "description": "The access mode of the volume",
+                            "default": [
+                                "ReadWriteOnce"
+                            ],
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "size": {
+                            "type": "string",
+                            "description": "The size of the volume",
+                            "default": "5Gi"
+                        },
+                        "annotations": {
+                            "type": "object",
+                            "description": "Annotations for the PVC",
+                            "default": {}
+                        },
+                        "selector": {
+                            "type": "object",
+                            "description": "Selector to match an existing Persistent Volume",
+                            "default": {}
+                        }
+                    }
+                }
+            }
+        },
+        "volumePermissions": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable init container that changes the owner/group of the PV mount point to `runAsUser:fsGroup`",
+                    "default": false
+                },
+                "image": {
+                    "type": "object",
+                    "properties": {
+                        "registry": {
+                            "type": "string",
+                            "description": "OS Shell + Utility image registry",
+                            "default": "REGISTRY_NAME"
+                        },
+                        "repository": {
+                            "type": "string",
+                            "description": "OS Shell + Utility image repository",
+                            "default": "REPOSITORY_NAME/os-shell"
+                        },
+                        "pullPolicy": {
+                            "type": "string",
+                            "description": "OS Shell + Utility image pull policy",
+                            "default": "IfNotPresent"
+                        },
+                        "pullSecrets": {
+                            "type": "array",
+                            "description": "OS Shell + Utility image pull secrets",
+                            "default": [],
+                            "items": {}
+                        }
+                    }
+                },
+                "resourcesPreset": {
+                    "type": "string",
+                    "description": "Set init container resources according to one common preset (allowed values: none, nano, small, medium, large, xlarge, 2xlarge). This is ignored if volumePermissions.resources is set (volumePermissions.resources is recommended for production).",
+                    "default": "nano"
+                },
+                "resources": {
+                    "type": "object",
+                    "description": "Set init container requests and limits for different resources like CPU or memory (essential for production workloads)",
+                    "default": {}
+                },
+                "containerSecurityContext": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enabled init container' Security Context",
+                            "default": true
+                        },
+                        "runAsUser": {
+                            "type": "number",
+                            "description": "Set init container's Security Context runAsUser",
+                            "default": 0
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

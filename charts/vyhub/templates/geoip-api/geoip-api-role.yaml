@@ -1,0 +1,16 @@
+{{ if .Values.geoipApi.rbac.create }}
+kind: Role
+apiVersion: {{ include "common.capabilities.rbac.apiVersion" . }}
+metadata:
+  name: {{ include "vyhub.geoipApi.name" . }}
+  namespace: {{ include "common.names.namespace" . | quote }}
+  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: geoip-api
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+rules:
+  {{- if .Values.geoipApi.rbac.rules }}
+  {{- include "common.tplvalues.render" ( dict "value" .Values.geoipApi.rbac.rules "context" $ ) | nindent 2 }}
+  {{- end }}
+{{- end }}

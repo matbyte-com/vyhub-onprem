@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ template "vyhub.app.name" . }}-nginx"
+data:
+  nginx.conf: |
+    server {
+      listen       8080;
+      server_name  localhost;
+      root /usr/share/nginx/html;
+      add_header X-Frame-Options DENY;
+      add_header X-Content-Type-Options nosniff;
+      add_header X-XSS-Protection "1; mode=block";
+      add_header Referrer-Policy "no-referrer";
+      server_tokens off;
+
+
+      location ~* (config\.js|favicon\.svg|index\.html)$ {
+        expires 60s;
+      }
+
+      location ~* \.(css|js|svg|png|jpg|jpeg|ico|ttf|eot|woff|woff2)$ {
+        expires 14d;
+      }
+
+      location / {
+        expires 14d;
+        try_files $uri $uri/ $uri.html /index.html;
+      }
+    }

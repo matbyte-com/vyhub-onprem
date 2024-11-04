@@ -1,0 +1,23 @@
+{{- if .Values.geoipApi.pdb.create }}
+apiVersion: {{ include "common.capabilities.policy.apiVersion" . }}
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "vyhub.geoipApi.name" . }}
+  namespace: {{ include "common.names.namespace" . | quote }}
+  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: geoip-api
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.geoipApi.pdb.minAvailable }}
+  minAvailable: {{ .Values.geoipApi.pdb.minAvailable }}
+  {{- end  }}
+  {{- if or .Values.geoipApi.pdb.maxUnavailable ( not .Values.geoipApi.pdb.minAvailable ) }}
+  maxUnavailable: {{ .Values.geoipApi.pdb.maxUnavailable | default 1 }}
+  {{- end  }}
+  {{- $podLabels := include "common.tplvalues.merge" ( dict "values" ( list .Values.geoipApi.podLabels .Values.commonLabels ) "context" . ) }}
+  selector:
+    matchLabels: {{- include "common.labels.matchLabels" ( dict "customLabels" $podLabels "context" $ ) | nindent 6 }}
+      app.kubernetes.io/component: geoip-api
+{{- end }}
