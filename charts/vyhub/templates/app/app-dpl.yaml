@@ -1,0 +1,308 @@
+apiVersion: {{ include "common.capabilities.deployment.apiVersion" . }}
+kind: Deployment
+metadata:
+  name: {{ template "vyhub.app.name" . }}
+  namespace: {{ include "common.names.namespace" . | quote }}
+  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: app
+  {{- if or .Values.app.deploymentAnnotations .Values.commonAnnotations }}
+  {{- $annotations := include "common.tplvalues.merge" (dict "values" (list .Values.app.deploymentAnnotations .Values.commonAnnotations) "context" .) }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" $annotations "context" $ ) | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if not .Values.app.autoscaling.hpa.enabled }}
+  replicas: {{ .Values.app.replicaCount }}
+  {{- end }}
+  {{- if .Values.app.updateStrategy }}
+  strategy: {{- toYaml .Values.app.updateStrategy | nindent 4 }}
+  {{- end }}
+  {{- $podLabels := include "common.tplvalues.merge" (dict "values" (list .Values.app.podLabels .Values.commonLabels) "context" .) }}
+  selector:
+    matchLabels: {{- include "common.labels.matchLabels" ( dict "customLabels" $podLabels "context" $ ) | nindent 6 }}
+      app.kubernetes.io/component: app
+  template:
+    metadata:
+      {{- if .Values.app.podAnnotations }}
+      annotations: {{- include "common.tplvalues.render" (dict "value" .Values.app.podAnnotations "context" $) | nindent 8 }}
+      {{- end }}
+      labels: {{- include "common.labels.standard" ( dict "customLabels" $podLabels "context" $ ) | nindent 8 }}
+        app.kubernetes.io/component: app
+    spec:
+      {{- include "vyhub.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ template "vyhub.app.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.app.automountServiceAccountToken }}
+      {{- if .Values.app.hostAliases }}
+      hostAliases: {{- include "common.tplvalues.render" (dict "value" .Values.app.hostAliases "context" $) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.app.affinity }}
+      affinity: {{- include "common.tplvalues.render" ( dict "value" .Values.app.affinity "context" $) | nindent 8 }}
+      {{- else }}
+      affinity:
+        podAffinity: {{- include "common.affinities.pods" (dict "type" .Values.app.podAffinityPreset "component" "app" "customLabels" $podLabels "context" $) | nindent 10 }}
+        podAntiAffinity: {{- include "common.affinities.pods" (dict "type" .Values.app.podAntiAffinityPreset "component" "app" "customLabels" $podLabels "context" $) | nindent 10 }}
+        nodeAffinity: {{- include "common.affinities.nodes" (dict "type" .Values.app.nodeAffinityPreset.type "key" .Values.app.nodeAffinityPreset.key "values" .Values.app.nodeAffinityPreset.values) | nindent 10 }}
+      {{- end }}
+      {{- if .Values.app.nodeSelector }}
+      nodeSelector: {{- include "common.tplvalues.render" ( dict "value" .Values.app.nodeSelector "context" $) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.app.tolerations }}
+      tolerations: {{- include "common.tplvalues.render" (dict "value" .Values.app.tolerations "context" .) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.app.priorityClassName }}
+      priorityClassName: {{ .Values.app.priorityClassName | quote }}
+      {{- end }}
+      {{- if .Values.app.schedulerName }}
+      schedulerName: {{ .Values.app.schedulerName | quote }}
+      {{- end }}
+      {{- if .Values.app.topologySpreadConstraints }}
+      topologySpreadConstraints: {{- include "common.tplvalues.render" (dict "value" .Values.app.topologySpreadConstraints "context" .) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.app.podSecurityContext.enabled }}
+      securityContext: {{- omit .Values.app.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if .Values.app.terminationGracePeriodSeconds }}
+      terminationGracePeriodSeconds: {{ .Values.app.terminationGracePeriodSeconds }}
+      {{- end }}
+      initContainers:
+        {{- if and .Values.volumePermissions.enabled .Values.persistence.enabled }}
+        - name: volume-permissions
+          image: {{ include "app.volumePermissions.image" . }}
+          imagePullPolicy: {{ .Values.volumePermissions.image.pullPolicy | quote }}
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              chown -vR {{ .Values.backend.containerSecurityContext.runAsUser }}:{{ .Values.backend.podSecurityContext.fsGroup }} /opt/vyhub/web
+          {{- if .Values.volumePermissions.containerSecurityContext.enabled }}
+          securityContext: {{- include "common.compatibility.renderSecurityContext" (dict "secContext" .Values.volumePermissions.containerSecurityContext "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.volumePermissions.resources }}
+          resources: {{- toYaml .Values.volumePermissions.resources | nindent 12 }}
+          {{- else if ne .Values.volumePermissions.resourcesPreset "none" }}
+          resources: {{- include "common.resources.preset" (dict "type" .Values.volumePermissions.resourcesPreset) | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: web
+              mountPath: /opt/vyhub/web
+              {{- if .Values.persistence.web.subPath }}
+              subPath: {{ .Values.persistence.web.subPath }}
+              {{- end }}
+        {{- end }}
+        {{- if .Values.app.initContainers }}
+          {{- include "common.tplvalues.render" (dict "value" .Values.app.initContainers "context" $) | nindent 8 }}
+        {{- end }}
+      containers:
+        - name: app
+          image: {{ template "vyhub.app.image" . }}
+          imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+          {{- if .Values.app.containerSecurityContext.enabled }}
+          securityContext: {{- include "common.compatibility.renderSecurityContext" (dict "secContext" .Values.app.containerSecurityContext "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.diagnosticMode.enabled }}
+          command: {{- include "common.tplvalues.render" (dict "value" .Values.diagnosticMode.command "context" $) | nindent 12 }}
+          {{- else if .Values.app.command }}
+          command: {{- include "common.tplvalues.render" (dict "value" .Values.app.command "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.diagnosticMode.enabled }}
+          args: {{- include "common.tplvalues.render" (dict "value" .Values.diagnosticMode.args "context" $) | nindent 12 }}
+          {{- else if .Values.app.args }}
+          args: {{- include "common.tplvalues.render" (dict "value" .Values.app.args "context" $) | nindent 12 }}
+          {{- end }}
+          env:
+            - name: VYHUB_CRYPT_SECRET
+              valueFrom:
+                {{- if .Values.app.existingSecret }}
+                secretKeyRef:
+                  name: {{ .Values.app.existingSecret }}
+                  key: cryptSecret
+                {{- else }}
+                secretKeyRef:
+                  name: {{ template "vyhub.app.name" . }}
+                  key: cryptSecret
+                {{- end }}
+            - name: VYHUB_SESSION_SECRET
+              valueFrom:
+                {{- if .Values.app.existingSecret }}
+                secretKeyRef:
+                  name: {{ .Values.app.existingSecret }}
+                  key: sessionSecret
+                {{- else }}
+                secretKeyRef:
+                  name: {{ template "vyhub.app.name" . }}
+                  key: sessionSecret
+                {{- end }}
+            {{- if .Values.app.extraEnvVars }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.app.extraEnvVars "context" $) | nindent 12 }}
+            {{- end }}
+          envFrom:
+            - configMapRef:
+                name: "{{ template "vyhub.app.name" . }}-env"
+            {{- if .Values.app.extraEnvVarsCM }}
+            - configMapRef:
+                name: {{ include "common.tplvalues.render" (dict "value" .Values.app.extraEnvVarsCM "context" $) }}
+            {{- end }}
+            {{- if .Values.app.extraEnvVarsSecret }}
+            - secretRef:
+                name: {{ include "common.tplvalues.render" (dict "value" .Values.app.extraEnvVarsSecret "context" $) }}
+            {{- end }}
+          {{- if .Values.app.resources }}
+          resources: {{- toYaml .Values.app.resources | nindent 12 }}
+          {{- else if ne .Values.app.resourcesPreset "none" }}
+          resources: {{- include "common.resources.preset" (dict "type" .Values.app.resourcesPreset) | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: app-http
+              containerPort: {{ .Values.app.containerPorts.http }}
+            {{- if .Values.app.extraContainerPorts }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.app.extraContainerPorts "context" $) | nindent 12 }}
+            {{- end }}
+          {{- if not .Values.diagnosticMode.enabled }}
+          {{- if .Values.app.customLivenessProbe }}
+          livenessProbe: {{- include "common.tplvalues.render" (dict "value" .Values.app.customLivenessProbe "context" $) | nindent 12 }}
+          {{- else if .Values.app.livenessProbe.enabled }}
+          livenessProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.app.livenessProbe "enabled") "context" $) | nindent 12 }}
+            httpGet:
+              path: /api/healthz
+              port: {{ .Values.app.containerPorts.http }}
+              scheme: HTTP
+          {{- end }}
+          {{- if .Values.app.customReadinessProbe }}
+          readinessProbe: {{- include "common.tplvalues.render" (dict "value" .Values.app.customReadinessProbe "context" $) | nindent 12 }}
+          {{- else if .Values.app.readinessProbe.enabled }}
+          readinessProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.app.readinessProbe "enabled") "context" $) | nindent 12 }}
+            httpGet:
+              path: /api/healthz
+              port: {{ .Values.app.containerPorts.http }}
+              scheme: HTTP
+          {{- end }}
+          {{- if .Values.app.customStartupProbe }}
+          startupProbe: {{- include "common.tplvalues.render" (dict "value" .Values.app.customStartupProbe "context" $) | nindent 12 }}
+          {{- else if .Values.app.startupProbe.enabled }}
+          startupProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.app.startupProbe "enabled") "context" $) | nindent 12 }}
+            httpGet:
+              path: /api/healthz
+              port: {{ .Values.app.containerPorts.http }}
+              scheme: HTTP
+          {{- end }}
+          {{- end }}
+          {{- if .Values.app.lifecycleHooks }}
+          lifecycle: {{- include "common.tplvalues.render" (dict "value" .Values.app.lifecycleHooks "context" $) | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: web
+              mountPath: /opt/vyhub/web
+              {{- if .Values.persistence.subPath }}
+              subPath: {{ .Values.persistence.web.subPath }}
+              {{- end }}
+            - name: empty-dir
+              mountPath: /tmp
+              subPath: tmp-dir
+          {{- if .Values.app.extraVolumeMounts }}
+          {{- include "common.tplvalues.render" (dict "value" .Values.app.extraVolumeMounts "context" $) | nindent 12 }}
+          {{- end }}
+        - name: frontend
+          image: {{ template "vyhub.frontend.image" . }}
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          {{- if .Values.frontend.containerSecurityContext.enabled }}
+          securityContext: {{- include "common.compatibility.renderSecurityContext" (dict "secContext" .Values.frontend.containerSecurityContext "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.diagnosticMode.enabled }}
+          command: {{- include "common.tplvalues.render" (dict "value" .Values.diagnosticMode.command "context" $) | nindent 12 }}
+          {{- else if .Values.frontend.command }}
+          command: {{- include "common.tplvalues.render" (dict "value" .Values.frontend.command "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.diagnosticMode.enabled }}
+          args: {{- include "common.tplvalues.render" (dict "value" .Values.diagnosticMode.args "context" $) | nindent 12 }}
+          {{- else if .Values.frontend.args }}
+          args: {{- include "common.tplvalues.render" (dict "value" .Values.frontend.args "context" $) | nindent 12 }}
+          {{- end }}
+          env:
+            {{- if .Values.frontend.extraEnvVars }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.frontend.extraEnvVars "context" $) | nindent 12 }}
+            {{- end }}
+          envFrom:
+            {{- if .Values.frontend.extraEnvVarsCM }}
+            - configMapRef:
+                name: {{ include "common.tplvalues.render" (dict "value" .Values.frontend.extraEnvVarsCM "context" $) }}
+            {{- end }}
+            {{- if .Values.frontend.extraEnvVarsSecret }}
+            - secretRef:
+                name: {{ include "common.tplvalues.render" (dict "value" .Values.frontend.extraEnvVarsSecret "context" $) }}
+            {{- end }}
+          {{- if .Values.frontend.resources }}
+          resources: {{- toYaml .Values.frontend.resources | nindent 12 }}
+          {{- else if ne .Values.frontend.resourcesPreset "none" }}
+          resources: {{- include "common.resources.preset" (dict "type" .Values.frontend.resourcesPreset) | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: frontend-http
+              containerPort: {{ .Values.frontend.containerPorts.http }}
+            {{- if .Values.frontend.extraContainerPorts }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.frontend.extraContainerPorts "context" $) | nindent 12 }}
+            {{- end }}
+          {{- if not .Values.diagnosticMode.enabled }}
+          {{- if .Values.frontend.customLivenessProbe }}
+          livenessProbe: {{- include "common.tplvalues.render" (dict "value" .Values.frontend.customLivenessProbe "context" $) | nindent 12 }}
+          {{- else if .Values.frontend.livenessProbe.enabled }}
+          livenessProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.frontend.livenessProbe "enabled") "context" $) | nindent 12 }}
+            httpGet:
+              path: /
+              port: {{ .Values.frontend.containerPorts.http }}
+              scheme: HTTP
+          {{- end }}
+          {{- if .Values.frontend.customReadinessProbe }}
+          readinessProbe: {{- include "common.tplvalues.render" (dict "value" .Values.frontend.customReadinessProbe "context" $) | nindent 12 }}
+          {{- else if .Values.frontend.readinessProbe.enabled }}
+          readinessProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.frontend.readinessProbe "enabled") "context" $) | nindent 12 }}
+            httpGet:
+              path: /
+              port: {{ .Values.frontend.containerPorts.http }}
+              scheme: HTTP
+          {{- end }}
+          {{- if .Values.frontend.customStartupProbe }}
+          startupProbe: {{- include "common.tplvalues.render" (dict "value" .Values.frontend.customStartupProbe "context" $) | nindent 12 }}
+          {{- else if .Values.frontend.startupProbe.enabled }}
+          startupProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.frontend.startupProbe "enabled") "context" $) | nindent 12 }}
+            httpGet:
+              path: /
+              port: {{ .Values.frontend.containerPorts.http }}
+              scheme: HTTP
+          {{- end }}
+          {{- end }}
+          {{- if .Values.frontend.lifecycleHooks }}
+          lifecycle: {{- include "common.tplvalues.render" (dict "value" .Values.frontend.lifecycleHooks "context" $) | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: empty-dir
+              mountPath: /tmp
+              subPath: tmp-dir
+            - name: web
+              mountPath: /usr/share/nginx/html
+              {{- if .Values.persistence.subPath }}
+              subPath: {{ .Values.persistence.web.subPath }}
+              {{- end }}
+            - name: nginx-config-volume
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: nginx.conf
+          {{- if .Values.frontend.extraVolumeMounts }}
+          {{- include "common.tplvalues.render" (dict "value" .Values.frontend.extraVolumeMounts "context" $) | nindent 12 }}
+          {{- end }}
+        {{- if .Values.app.sidecars }}
+        {{- include "common.tplvalues.render" ( dict "value" .Values.app.sidecars "context" $) | nindent 8 }}
+        {{- end }}
+      volumes:
+        - name: empty-dir
+          emptyDir: {}
+        - name: nginx-config-volume
+          configMap:
+            name: "{{ template "vyhub.app.name" . }}-nginx"
+        - name: web
+        {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-web" (include "common.names.fullname" .)) .Values.persistence.web.existingClaim }}
+        {{- else }}
+          emptyDir: {}
+        {{- end }}
+        {{- if .Values.app.extraVolumes }}
+        {{- include "common.tplvalues.render" (dict "value" .Values.app.extraVolumes "context" $) | nindent 8 }}
+        {{- end }}

@@ -1,0 +1,16 @@
+{{ if .Values.pdfApi.rbac.create }}
+kind: Role
+apiVersion: {{ include "common.capabilities.rbac.apiVersion" . }}
+metadata:
+  name: {{ include "vyhub.pdfApi.name" . }}
+  namespace: {{ include "common.names.namespace" . | quote }}
+  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: pdf-api
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+rules:
+  {{- if .Values.pdfApi.rbac.rules }}
+  {{- include "common.tplvalues.render" ( dict "value" .Values.pdfApi.rbac.rules "context" $ ) | nindent 2 }}
+  {{- end }}
+{{- end }}

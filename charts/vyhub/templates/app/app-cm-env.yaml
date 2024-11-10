@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ template "vyhub.app.name" . }}-env"
+  namespace: {{ include "common.names.namespace" . | quote }}
+  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: app
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+data:
+  {{- with .Values.app.config }}
+  VYHUB_BASE_URL: "{{ .baseUrl }}"
+  VYHUB_ROOT_PATH: "{{ .rootPath }}"
+  VYHUB_PATH_PREFIX: "{{ .pathPrefix }}"
+  VYHUB_FRONTEND_URL: "{{ .frontendUrl }}"
+  VYHUB_BACKEND_URL: "{{ .backendUrl }}"
+  VYHUB_GEOIP_API_URL: "http://{{ template "vyhub.geoipApi.name" $ }}.{{ $.Release.Namespace }}.svc.cluster.local:8080"
+  VYHUB_PDF_API_URL: "http://{{ template "vyhub.pdfApi.name" $ }}.{{ $.Release.Namespace }}.svc.cluster.local:9090/v1/convert"
+  VYHUB_INSTANCE_ID: "{{ .instanceId }}"
+  VYHUB_INSTANCE_UID: "{{ .instanceUid }}"
+  VYHUB_ADDONS: "{{ .addons | join "," }}"
+  VYHUB_CUSTOM_FRONTEND: "{{ .customFrontend }}"
+  VYHUB_SERVER_DEBUG: "{{ .server.debug }}"
+  VYHUB_SERVER_ECHO: "{{ .server.echo }}"
+  VYHUB_SERVER_SECURE: "{{ .server.secure }}"
+  VYHUB_SERVER_GEN_CERT: "{{ .server.genCert }}"
+  VYHUB_SERVER_PORT: "{{ .server.port }}"
+  VYHUB_SERVER_WORKERS: "{{ .server.workers }}"
+  VYHUB_DATABASE_SCHEMA: "{{ .database.schema }}"
+  VYHUB_DATABASE_MAX_WAIT: "{{ .database.maxWait }}"
+  VYHUB_DATABASE_POOL_SIZE: "{{ .database.poolSize }}"
+  VYHUB_DATABASE_POOL_OVERFLOW: "{{ .database.poolOverflow }}"
+  VYHUB_LOGGING_LOKI_URL: "{{ .logging.lokiUrl }}"
+  {{- end }}

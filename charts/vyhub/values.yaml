@@ -1,0 +1,1818 @@
+## @section Global parameters
+## Global Docker image parameters
+## Please, note that this will override the image parameters, including dependencies, configured to use the global value
+## Current available global Docker image parameters: imageRegistry, imagePullSecrets and storageClass
+##
+
+## @param global.imageRegistry Global Docker image registry
+## @param global.imagePullSecrets Global Docker registry secret names as an array
+## @param global.defaultStorageClass Global default StorageClass for Persistent Volume(s)
+##
+global:
+  imageRegistry: ""
+  ## e.g:
+  ## imagePullSecrets:
+  ##   - myRegistryKeySecretName
+  ##
+  imagePullSecrets: []
+  defaultStorageClass: ""
+  ## Compatibility adaptations for Kubernetes platforms
+  ##
+  compatibility:
+    ## Compatibility adaptations for Openshift
+    ##
+    openshift:
+      ## @param global.compatibility.openshift.adaptSecurityContext Adapt the securityContext sections of the deployment to make them compatible with Openshift restricted-v2 SCC: remove runAsUser, runAsGroup and fsGroup and let the platform use their allowed default IDs. Possible values: auto (apply if the detected running cluster is Openshift), force (perform the adaptation always), disabled (do not perform adaptation)
+      ##
+      adaptSecurityContext: auto
+    ## @param global.compatibility.omitEmptySeLinuxOptions If set to true, removes the seLinuxOptions from the securityContexts when it is set to an empty object
+    ##
+    omitEmptySeLinuxOptions: false
+
+## @section Common parameters
+##
+
+## @param kubeVersion Override Kubernetes version
+##
+kubeVersion: ""
+## @param nameOverride String to partially override common.names.name
+##
+nameOverride: ""
+## @param fullnameOverride String to fully override common.names.fullname
+##
+fullnameOverride: ""
+## @param namespaceOverride String to fully override common.names.namespace
+##
+namespaceOverride: ""
+## @param commonLabels Labels to add to all deployed objects
+##
+commonLabels: {}
+## @param commonAnnotations Annotations to add to all deployed objects
+##
+commonAnnotations: {}
+## @param clusterDomain Kubernetes cluster domain name
+##
+clusterDomain: cluster.local
+## @param extraDeploy Array of extra objects to deploy with the release
+##
+extraDeploy: []
+## Diagnostic mode
+## @param diagnosticMode.enabled Enable diagnostic mode (all probes will be disabled and the command will be overridden)
+## @param diagnosticMode.command Command to override all containers in the chart release
+## @param diagnosticMode.args Args to override all containers in the chart release
+##
+diagnosticMode:
+  enabled: false
+  command:
+    - sleep
+  args:
+    - infinity
+
+## @section VyHub app Parameters
+##
+
+app:
+  ## VyHub app container image
+  ## @param app.image.registry VyHub app image registry
+  ## @param app.image.repository VyHub app image repository
+  ## @skip app.image.tag VyHub app image tag (immutable tags are recommended)
+  ## @param app.image.digest VyHub app image digest in the way sha256:aa.... Please note this parameter, if set, will override the tag image tag (immutable tags are recommended)
+  ## @param app.image.pullPolicy VyHub app image pull policy
+  ## @param app.image.pullSecrets VyHub app image pull secrets
+  ## @param app.image.debug Enable VyHub app image debug mode
+  ##
+  image:
+    registry: registry.matbyte.com
+    repository: vyhub/vyhub-onprem
+    tag: 2.2.4
+    digest: ""
+    ## Specify a imagePullPolicy
+    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
+    ##
+    pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## e.g:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: []
+    debug: false
+  ## @param app.replicaCount Number of VyHub app replicas to deploy
+  ##
+  replicaCount: 1
+  ## @param app.containerPorts.http VyHub app HTTP container port
+  ##
+  containerPorts:
+    http: 5050
+  ## @param app.extraContainerPorts Optionally specify extra list of additional ports for VyHub app containers
+  ## e.g:
+  ## extraContainerPorts:
+  ##   - name: myservice
+  ##     containerPort: 9090
+  ##
+  extraContainerPorts: []
+  ## Configure extra options for VyHub app containers' liveness and readiness probes
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+  ## @param app.livenessProbe.enabled Enable livenessProbe on VyHub app containers
+  ## @param app.livenessProbe.initialDelaySeconds Initial delay seconds for livenessProbe
+  ## @param app.livenessProbe.periodSeconds Period seconds for livenessProbe
+  ## @param app.livenessProbe.timeoutSeconds Timeout seconds for livenessProbe
+  ## @param app.livenessProbe.failureThreshold Failure threshold for livenessProbe
+  ## @param app.livenessProbe.successThreshold Success threshold for livenessProbe
+  ##
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+  ## @param app.readinessProbe.enabled Enable readinessProbe on VyHub app containers
+  ## @param app.readinessProbe.initialDelaySeconds Initial delay seconds for readinessProbe
+  ## @param app.readinessProbe.periodSeconds Period seconds for readinessProbe
+  ## @param app.readinessProbe.timeoutSeconds Timeout seconds for readinessProbe
+  ## @param app.readinessProbe.failureThreshold Failure threshold for readinessProbe
+  ## @param app.readinessProbe.successThreshold Success threshold for readinessProbe
+  ##
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+    successThreshold: 1
+  ## @param app.startupProbe.enabled Enable startupProbe on VyHub app containers
+  ## @param app.startupProbe.initialDelaySeconds Initial delay seconds for startupProbe
+  ## @param app.startupProbe.periodSeconds Period seconds for startupProbe
+  ## @param app.startupProbe.timeoutSeconds Timeout seconds for startupProbe
+  ## @param app.startupProbe.failureThreshold Failure threshold for startupProbe
+  ## @param app.startupProbe.successThreshold Success threshold for startupProbe
+  ##
+  startupProbe:
+    enabled: true
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 60
+    successThreshold: 1
+  ## @param app.customLivenessProbe Custom livenessProbe that overrides the default one
+  ##
+  customLivenessProbe: {}
+  ## @param app.customReadinessProbe Custom readinessProbe that overrides the default one
+  ##
+  customReadinessProbe: {}
+  ## @param app.customStartupProbe Custom startupProbe that overrides the default one
+  ##
+  customStartupProbe: {}
+  ## VyHub app resource requests and limits
+  ## ref: http://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  ## @param app.resourcesPreset Set VyHub app container resources according to one common preset (allowed values: none, nano, small, medium, large, xlarge, 2xlarge). This is ignored if app.resources is set (app.resources is recommended for production).
+  ## More information: https://github.com/bitnami/charts/blob/main/bitnami/common/templates/_resources.tpl#L15
+  ##
+  resourcesPreset: "small"
+  ## @param app.resources Set VyHub app container requests and limits for different resources like CPU or memory (essential for production workloads)
+  ## Example:
+  ## resources:
+  ##   requests:
+  ##     cpu: 2
+  ##     memory: 512Mi
+  ##   limits:
+  ##     cpu: 3
+  ##     memory: 1024Mi
+  ##
+  resources: {}
+  ## Configure Pods Security Context
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
+  ## @param app.podSecurityContext.enabled Enable VyHub app pods' Security Context
+  ## @param app.podSecurityContext.fsGroupChangePolicy Set filesystem group change policy for VyHub app pods
+  ## @param app.podSecurityContext.sysctls Set kernel settings using the sysctl interface for VyHub app pods
+  ## @param app.podSecurityContext.supplementalGroups Set filesystem extra groups for VyHub app pods
+  ## @param app.podSecurityContext.fsGroup Set fsGroup in VyHub app pods' Security Context
+  ##
+  podSecurityContext:
+    enabled: true
+    fsGroupChangePolicy: Always
+    sysctls: []
+    supplementalGroups: []
+    fsGroup: 1001
+  ## Configure Container Security Context
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+  ## @param app.containerSecurityContext.enabled Enabled VyHub app container' Security Context
+  ## @param app.containerSecurityContext.seLinuxOptions [object,nullable] Set SELinux options in VyHub app container
+  ## @param app.containerSecurityContext.runAsUser Set runAsUser in VyHub app container' Security Context
+  ## @param app.containerSecurityContext.runAsGroup Set runAsGroup in VyHub app container' Security Context
+  ## @param app.containerSecurityContext.runAsNonRoot Set runAsNonRoot in VyHub app container' Security Context
+  ## @param app.containerSecurityContext.readOnlyRootFilesystem Set readOnlyRootFilesystem in VyHub app container' Security Context
+  ## @param app.containerSecurityContext.privileged Set privileged in VyHub app container' Security Context
+  ## @param app.containerSecurityContext.allowPrivilegeEscalation Set allowPrivilegeEscalation in VyHub app container' Security Context
+  ## @param app.containerSecurityContext.capabilities.drop List of capabilities to be dropped in VyHub app container
+  ## @param app.containerSecurityContext.seccompProfile.type Set seccomp profile in VyHub app container
+  ##
+  containerSecurityContext:
+    enabled: true
+    seLinuxOptions: {}
+    runAsUser: 1001
+    runAsGroup: 1001
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    privileged: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: "RuntimeDefault"
+  ## @param app.command Override default VyHub app container command (useful when using custom images)
+  ##
+  command: []
+  ## @param app.args Override default VyHub app container args (useful when using custom images)
+  ##
+  args: []
+  ## @param app.automountServiceAccountToken Mount Service Account token in VyHub app pods
+  ##
+  automountServiceAccountToken: false
+  ## @param app.hostAliases VyHub app pods host aliases
+  ## https://kubernetes.io/docs/concepts/services-networking/add-entries-to-pod-etc-hosts-with-host-aliases/
+  ##
+  hostAliases: []
+  ## @param app.daemonsetAnnotations Annotations for VyHub app daemonset
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  ##
+  daemonsetAnnotations: {}
+  ## @param app.deploymentAnnotations Annotations for VyHub app deployment
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  ##
+  deploymentAnnotations: {}
+  ## @param app.statefulsetAnnotations Annotations for VyHub app statefulset
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  ##
+  statefulsetAnnotations: {}
+  ## @param app.podLabels Extra labels for VyHub app pods
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+  ##
+  podLabels: {}
+  ## @param app.podAnnotations Annotations for VyHub app pods
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  ##
+  podAnnotations: {}
+  ## @param app.podAffinityPreset Pod affinity preset. Ignored if `app.affinity` is set. Allowed values: `soft` or `hard`
+  ## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity
+  ##
+  podAffinityPreset: ""
+  ## @param app.podAntiAffinityPreset Pod anti-affinity preset. Ignored if `app.affinity` is set. Allowed values: `soft` or `hard`
+  ## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity
+  ##
+  podAntiAffinityPreset: soft
+  ## Node app.affinity preset
+  ## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#node-affinity
+  ##
+  nodeAffinityPreset:
+    ## @param app.nodeAffinityPreset.type Node affinity preset type. Ignored if `app.affinity` is set. Allowed values: `soft` or `hard`
+    ##
+    type: ""
+    ## @param app.nodeAffinityPreset.key Node label key to match. Ignored if `app.affinity` is set
+    ##
+    key: ""
+    ## @param app.nodeAffinityPreset.values Node label values to match. Ignored if `app.affinity` is set
+    ## E.g.
+    ## values:
+    ##   - e2e-az1
+    ##   - e2e-az2
+    ##
+    values: []
+  ## @param app.affinity Affinity for VyHub app pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  ## NOTE: `app.podAffinityPreset`, `app.podAntiAffinityPreset`, and `app.nodeAffinityPreset` will be ignored when it's set
+  ##
+  affinity: {}
+  ## @param app.nodeSelector Node labels for VyHub app pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+  ##
+  nodeSelector: {}
+  ## @param app.tolerations Tolerations for VyHub app pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  ##
+  tolerations: []
+  ## @param app.updateStrategy.type VyHub app deployment strategy type
+  ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+  ##
+  updateStrategy:
+    ## Can be set to RollingUpdate or Recreate
+    ##
+    type: RollingUpdate
+  ## @param app.priorityClassName VyHub app pods' priorityClassName
+  ##
+  priorityClassName: ""
+  ## @param app.topologySpreadConstraints Topology Spread Constraints for VyHub app pod assignment spread across your cluster among failure-domains
+  ## Ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/#spread-constraints-for-pods
+  ##
+  topologySpreadConstraints: []
+  ## @param app.schedulerName Name of the k8s scheduler (other than default) for VyHub app pods
+  ## ref: https://kubernetes.io/docs/tasks/administer-cluster/configure-multiple-schedulers/
+  ##
+  schedulerName: ""
+  ## @param app.terminationGracePeriodSeconds Seconds VyHub app pods need to terminate gracefully
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods
+  ##
+  terminationGracePeriodSeconds: ""
+  ## @param app.lifecycleHooks for VyHub app containers to automate configuration before or after startup
+  ##
+  lifecycleHooks: {}
+  ## @param app.extraEnvVars Array with extra environment variables to add to VyHub app containers
+  ## e.g:
+  ## extraEnvVars:
+  ##   - name: FOO
+  ##     value: "bar"
+  ##
+  extraEnvVars: []
+  ## @param app.extraEnvVarsCM Name of existing ConfigMap containing extra env vars for VyHub app containers
+  ##
+  extraEnvVarsCM: ""
+  ## @param app.extraEnvVarsSecret Name of existing Secret containing extra env vars for VyHub app containers
+  ##
+  extraEnvVarsSecret: ""
+  ## @param app.extraVolumes Optionally specify extra list of additional volumes for the VyHub app pods
+  ##
+  extraVolumes: []
+  ## @param app.extraVolumeMounts Optionally specify extra list of additional volumeMounts for the VyHub app containers
+  ##
+  extraVolumeMounts: []
+  ## @param app.sidecars Add additional sidecar containers to the VyHub app pods
+  ## e.g:
+  ## sidecars:
+  ##   - name: your-image-name
+  ##     image: your-image
+  ##     imagePullPolicy: Always
+  ##     ports:
+  ##       - name: portname
+  ##         containerPort: 1234
+  ##
+  sidecars: []
+  ## @param app.initContainers Add additional init containers to the VyHub app pods
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
+  ## e.g:
+  ## initContainers:
+  ##  - name: your-image-name
+  ##    image: your-image
+  ##    imagePullPolicy: Always
+  ##    command: ['sh', '-c', 'echo "hello world"']
+  ##
+  initContainers: []
+  ## Pod Disruption Budget configuration
+  ## ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb
+  ## @param app.pdb.create Enable/disable a Pod Disruption Budget creation
+  ## @param app.pdb.minAvailable Minimum number/percentage of pods that should remain scheduled
+  ## @param app.pdb.maxUnavailable Maximum number/percentage of pods that may be made unavailable. Defaults to `1` if both `app.pdb.minAvailable` and `app.pdb.maxUnavailable` are empty.
+  ##
+  pdb:
+    create: true
+    minAvailable: ""
+    maxUnavailable: ""
+  ## Autoscaling configuration
+  ## ref: https://kubernetes.io/docs/concepts/workloads/autoscaling/
+  ##
+  autoscaling:
+    ## @param app.autoscaling.vpa.enabled Enable VPA for VyHub app pods
+    ## @param app.autoscaling.vpa.annotations Annotations for VPA resource
+    ## @param app.autoscaling.vpa.controlledResources VPA List of resources that the vertical pod autoscaler can control. Defaults to cpu and memory
+    ## @param app.autoscaling.vpa.maxAllowed VPA Max allowed resources for the pod
+    ## @param app.autoscaling.vpa.minAllowed VPA Min allowed resources for the pod
+    ##
+    vpa:
+      enabled: false
+      annotations: {}
+      controlledResources: []
+      maxAllowed: {}
+      minAllowed: {}
+      ## @param app.autoscaling.vpa.updatePolicy.updateMode Autoscaling update policy
+      ## Specifies whether recommended updates are applied when a Pod is started and whether recommended updates are applied during the life of a Pod
+      ## Possible values are "Off", "Initial", "Recreate", and "Auto".
+      ##
+      updatePolicy:
+        updateMode: Auto
+    ## @param app.autoscaling.hpa.enabled Enable HPA for VyHub app pods
+    ## @param app.autoscaling.hpa.minReplicas Minimum number of replicas
+    ## @param app.autoscaling.hpa.maxReplicas Maximum number of replicas
+    ## @param app.autoscaling.hpa.targetCPU Target CPU utilization percentage
+    ## @param app.autoscaling.hpa.targetMemory Target Memory utilization percentage
+    ##
+    hpa:
+      enabled: false
+      minReplicas: ""
+      maxReplicas: ""
+      targetCPU: ""
+      targetMemory: ""
+  ## ServiceAccount configuration
+  ##
+  serviceAccount:
+    ## @param app.serviceAccount.create Specifies whether a ServiceAccount should be created
+    ##
+    create: true
+    ## @param app.serviceAccount.name The name of the ServiceAccount to use.
+    ## If not set and create is true, a name is generated using the common.names.fullname template
+    ##
+    name: ""
+    ## @param app.serviceAccount.annotations Additional Service Account annotations (evaluated as a template)
+    ##
+    annotations: {}
+    ## @param app.serviceAccount.automountServiceAccountToken Automount service account token for the server service account
+    ##
+    automountServiceAccountToken: true
+  ## RBAC configuration
+  ##
+  rbac:
+    ## @param app.rbac.create Specifies whether RBAC resources should be created
+    ##
+    create: false
+    ## @param app.rbac.rules Custom RBAC rules to set
+    ## e.g:
+    ## rules:
+    ##   - apiGroups:
+    ##       - ""
+    ##     resources:
+    ##       - pods
+    ##     verbs:
+    ##       - get
+    ##       - list
+    ##
+    rules: []
+  ## VyHub app service parameters
+  ##
+  service:
+    ## @param app.service.type VyHub app service type
+    ##
+    type: ClusterIP
+    ## @param app.service.ports.http VyHub app service HTTP port
+    ##
+    ports:
+      http: 5050
+    ## Node ports to expose
+    ## @param app.service.nodePorts.http Node port for HTTP
+    ## NOTE: choose port between <30000-32767>
+    ##
+    nodePorts:
+      http: ""
+    ## @param app.service.clusterIP VyHub app service Cluster IP
+    ## e.g.:
+    ## clusterIP: None
+    ##
+    clusterIP: ""
+    ## @param app.service.loadBalancerIP VyHub app service Load Balancer IP
+    ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#type-loadbalancer
+    ##
+    loadBalancerIP: ""
+    ## @param app.service.loadBalancerSourceRanges VyHub app service Load Balancer sources
+    ## ref: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/#restrict-access-for-loadbalancer-service
+    ## e.g:
+    ## loadBalancerSourceRanges:
+    ##   - 10.10.10.0/24
+    ##
+    loadBalancerSourceRanges: []
+    ## @param app.service.externalTrafficPolicy VyHub app service external traffic policy
+    ## ref http://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
+    ##
+    externalTrafficPolicy: Cluster
+    ## @param app.service.annotations Additional custom annotations for VyHub app service
+    ##
+    annotations: {}
+    ## @param app.service.extraPorts Extra ports to expose in VyHub app service (normally used with the `sidecars` value)
+    ##
+    extraPorts: []
+    ## @param app.service.sessionAffinity Control where client requests go, to the same pod or round-robin
+    ## Values: ClientIP or None
+    ## ref: https://kubernetes.io/docs/concepts/services-networking/service/
+    ##
+    sessionAffinity: None
+    ## @param app.service.sessionAffinityConfig Additional settings for the sessionAffinity
+    ## sessionAffinityConfig:
+    ##   clientIP:
+    ##     timeoutSeconds: 300
+    ##
+    sessionAffinityConfig: {}
+  ## @param app.existingSecret Existing secret for app
+  ## The secret must contain the keys:
+  ## `cryptSecret` (required),
+  ## `sessionSecret` (required),
+  ##
+  existingSecret: ""
+  ## VyHub app config
+  ##
+  config:
+    ## @param app.config.baseUrl The URL to the API (without /v1)
+    ##
+    baseUrl: http://vyhub.local
+    ## @param app.config.rootPath When a reverse proxy with path stripping is used, set this to the stripped path. For example /api.
+    ##
+    rootPath: ""
+    ## @param app.config.pathPrefix When a reverse proxy without path stripping is used, set this to path of the application. For example /api.
+    ##
+    pathPrefix: "/api"
+    ## @param app.config.frontendUrl The URL where the Frontend is located
+    ##
+    frontendUrl: ""
+    ## @param app.config.backendUrl The URL to the API (with /v1)
+    ##
+    backendUrl: ""
+    ## @param app.config.instanceId The VyHub instance ID
+    ##
+    instanceId: ""
+    ## @param app.config.instanceUid The VyHub instance UID
+    ##
+    instanceUid: ""
+    ## @param app.config.addons A list of enabled addons. Example: [forum, addon2, addon3]
+    ##
+    addons: []
+    ## @param app.config.customFrontend If enabled, the web folder stays untouched and frontend files must be supplied manually
+    ##
+    customFrontend: false
+    ## @param app.config.cryptSecret A random string with at least 32 chars
+    ## NOTE: This value is auto-generated and stored in a secret if not provided
+    ##
+    cryptSecret: ""
+    ## @param app.config.sessionSecret A random string with at least 32 chars
+    ## NOTE: This value is auto-generated and stored in a secret if not provided
+    ##
+    sessionSecret: ""
+    ## server config
+    ##
+    server:
+      ## @param app.config.server.debug Enables debug mode which causes stack traces to be printed. Should be false in production.
+      ##
+      debug: false
+      ## @param app.config.server.echo Enables output of all SQL queries (to stdout)
+      ##
+      echo: false
+      ## @param app.config.server.secure Enables HTTPS for the application. Not required with a reverse proxy (nginx).
+      ##
+      secure: false
+      ## @param app.config.server.genCert Generates self-signed TLS certificates on startup for HTTPS
+      ##
+      genCert: false
+      ## @param app.config.server.port Specifies on which port the application listens
+      ##
+      port: 5050
+      ## @param app.config.server.workers Specifies how many processes of the application are running.
+      ## Can be slightly increased for more performance. (Caution: Make sure that enough memory (around 400MiB each) and postgres database connections (15 by default) are available)
+      ##
+      workers: 1
+    ## database config
+    ##
+    database:
+      ## @param app.config.database.schema The used postgres schema
+      ##
+      schema: public
+      ## @param app.config.database.maxWait The maximum amount of seconds the application wait for the database to become available
+      ##
+      maxWait: 30
+      ## @param app.config.database.poolSize The amount of connections that application always maintains to the database
+      ##
+      poolSize: 5
+      ## @param app.config.database.poolOverflow The maximum amount of connections that the application can establish additionally to the pool size. These connections will be closed if not needed anymore.
+      ##
+      poolOverflow: 20
+    ## logging config
+    ##
+    logging:
+      ## @param app.config.logging.lokiUrl The URL to the Loki logging server
+      ##
+      lokiUrl: ""
+
+## @section VyHub frontend Parameters
+##
+
+frontend:
+  ## VyHub frontend container image
+  ## @param frontend.image.registry VyHub frontend image registry
+  ## @param frontend.image.repository VyHub frontend image repository
+  ## @skip frontend.image.tag VyHub frontend image tag (immutable tags are recommended)
+  ## @param frontend.image.digest VyHub frontend image digest in the way sha256:aa.... Please note this parameter, if set, will override the tag image tag (immutable tags are recommended)
+  ## @param frontend.image.pullPolicy VyHub frontend image pull policy
+  ## @param frontend.image.pullSecrets VyHub frontend image pull secrets
+  ## @param frontend.image.debug Enable VyHub frontend image debug mode
+  ##
+  image:
+    registry: registry-1.docker.io
+    repository: nginxinc/nginx-unprivileged
+    tag: 1.27.2
+    digest: ""
+    ## Specify a imagePullPolicy
+    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
+    ##
+    pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## e.g:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: []
+    debug: false
+  ## @param frontend.containerPorts.http VyHub frontend HTTP container port
+  ##
+  containerPorts:
+    http: 8080
+  ## @param frontend.extraContainerPorts Optionally specify extra list of additional ports for VyHub frontend containers
+  ## e.g:
+  ## extraContainerPorts:
+  ##   - name: myservice
+  ##     containerPort: 9090
+  ##
+  extraContainerPorts: []
+  ## Configure extra options for VyHub frontend containers' liveness and readiness probes
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+  ## @param frontend.livenessProbe.enabled Enable livenessProbe on VyHub frontend containers
+  ## @param frontend.livenessProbe.initialDelaySeconds Initial delay seconds for livenessProbe
+  ## @param frontend.livenessProbe.periodSeconds Period seconds for livenessProbe
+  ## @param frontend.livenessProbe.timeoutSeconds Timeout seconds for livenessProbe
+  ## @param frontend.livenessProbe.failureThreshold Failure threshold for livenessProbe
+  ## @param frontend.livenessProbe.successThreshold Success threshold for livenessProbe
+  ##
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+  ## @param frontend.readinessProbe.enabled Enable readinessProbe on VyHub frontend containers
+  ## @param frontend.readinessProbe.initialDelaySeconds Initial delay seconds for readinessProbe
+  ## @param frontend.readinessProbe.periodSeconds Period seconds for readinessProbe
+  ## @param frontend.readinessProbe.timeoutSeconds Timeout seconds for readinessProbe
+  ## @param frontend.readinessProbe.failureThreshold Failure threshold for readinessProbe
+  ## @param frontend.readinessProbe.successThreshold Success threshold for readinessProbe
+  ##
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+    successThreshold: 1
+  ## @param frontend.startupProbe.enabled Enable startupProbe on VyHub frontend containers
+  ## @param frontend.startupProbe.initialDelaySeconds Initial delay seconds for startupProbe
+  ## @param frontend.startupProbe.periodSeconds Period seconds for startupProbe
+  ## @param frontend.startupProbe.timeoutSeconds Timeout seconds for startupProbe
+  ## @param frontend.startupProbe.failureThreshold Failure threshold for startupProbe
+  ## @param frontend.startupProbe.successThreshold Success threshold for startupProbe
+  ##
+  startupProbe:
+    enabled: true
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 30
+    successThreshold: 1
+  ## @param frontend.customLivenessProbe Custom livenessProbe that overrides the default one
+  ##
+  customLivenessProbe: {}
+  ## @param frontend.customReadinessProbe Custom readinessProbe that overrides the default one
+  ##
+  customReadinessProbe: {}
+  ## @param frontend.customStartupProbe Custom startupProbe that overrides the default one
+  ##
+  customStartupProbe: {}
+  ## VyHub frontend resource requests and limits
+  ## ref: http://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  ## @param frontend.resourcesPreset Set VyHub frontend container resources according to one common preset (allowed values: none, nano, small, medium, large, xlarge, 2xlarge). This is ignored if frontend.resources is set (frontend.resources is recommended for production).
+  ## More information: https://github.com/bitnami/charts/blob/main/bitnami/common/templates/_resources.tpl#L15
+  ##
+  resourcesPreset: "nano"
+  ## @param frontend.resources Set VyHub frontend container requests and limits for different resources like CPU or memory (essential for production workloads)
+  ## Example:
+  ## resources:
+  ##   requests:
+  ##     cpu: 2
+  ##     memory: 512Mi
+  ##   limits:
+  ##     cpu: 3
+  ##     memory: 1024Mi
+  ##
+  resources: {}
+  ## Configure Container Security Context
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+  ## @param frontend.containerSecurityContext.enabled Enabled VyHub frontend container' Security Context
+  ## @param frontend.containerSecurityContext.seLinuxOptions [object,nullable] Set SELinux options in VyHub frontend container
+  ## @param frontend.containerSecurityContext.runAsUser Set runAsUser in VyHub frontend container' Security Context
+  ## @param frontend.containerSecurityContext.runAsGroup Set runAsGroup in VyHub frontend container' Security Context
+  ## @param frontend.containerSecurityContext.runAsNonRoot Set runAsNonRoot in VyHub frontend container' Security Context
+  ## @param frontend.containerSecurityContext.readOnlyRootFilesystem Set readOnlyRootFilesystem in VyHub frontend container' Security Context
+  ## @param frontend.containerSecurityContext.privileged Set privileged in VyHub frontend container' Security Context
+  ## @param frontend.containerSecurityContext.allowPrivilegeEscalation Set allowPrivilegeEscalation in VyHub frontend container' Security Context
+  ## @param frontend.containerSecurityContext.capabilities.drop List of capabilities to be dropped in VyHub frontend container
+  ## @param frontend.containerSecurityContext.seccompProfile.type Set seccomp profile in VyHub frontend container
+  ##
+  containerSecurityContext:
+    enabled: true
+    seLinuxOptions: {}
+    runAsUser: 1001
+    runAsGroup: 1001
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    privileged: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: "RuntimeDefault"
+  ## @param frontend.command Override default VyHub frontend container command (useful when using custom images)
+  ##
+  command: []
+  ## @param frontend.args Override default VyHub frontend container args (useful when using custom images)
+  ##
+  args: []
+  ## @param frontend.lifecycleHooks for VyHub frontend containers to automate configuration before or after startup
+  ##
+  lifecycleHooks: {}
+  ## @param frontend.extraEnvVars Array with extra environment variables to add to VyHub frontend containers
+  ## e.g:
+  ## extraEnvVars:
+  ##   - name: FOO
+  ##     value: "bar"
+  ##
+  extraEnvVars: []
+  ## @param frontend.extraEnvVarsCM Name of existing ConfigMap containing extra env vars for VyHub frontend containers
+  ##
+  extraEnvVarsCM: ""
+  ## @param frontend.extraEnvVarsSecret Name of existing Secret containing extra env vars for VyHub frontend containers
+  ##
+  extraEnvVarsSecret: ""
+  ## @param frontend.extraVolumes Optionally specify extra list of additional volumes for the VyHub frontend pods
+  ##
+  extraVolumes: []
+  ## @param frontend.extraVolumeMounts Optionally specify extra list of additional volumeMounts for the VyHub frontend containers
+  ##
+  extraVolumeMounts: []
+  ## VyHub frontend service parameters
+  ##
+  service:
+    ## @param frontend.service.ports.http VyHub frontend service HTTP port
+    ##
+    ports:
+      http: 8080
+    ## Node ports to expose
+    ## @param frontend.service.nodePorts.http Node port for HTTP
+    ## NOTE: choose port between <30000-32767>
+    ##
+    nodePorts:
+      http: ""
+
+## @section VyHub GeoIP API Parameters
+##
+
+geoipApi:
+  ## VyHub GeoIP API container image
+  ## @param geoipApi.image.registry VyHub geoipApi image registry
+  ## @param geoipApi.image.repository VyHub geoipApi image repository
+  ## @skip geoipApi.image.tag VyHub geoipApi image tag (immutable tags are recommended)
+  ## @param geoipApi.image.digest VyHub geoipApi image digest in the way sha256:aa.... Please note this parameter, if set, will override the tag image tag (immutable tags are recommended)
+  ## @param geoipApi.image.pullPolicy VyHub geoipApi image pull policy
+  ## @param geoipApi.image.pullSecrets VyHub geoipApi image pull secrets
+  ## @param geoipApi.image.debug Enable VyHub geoipApi image debug mode
+  ##
+  image:
+    registry: registry-1.docker.io
+    repository: observabilitystack/geoip-api
+    tag: 2024-44
+    digest: ""
+    ## Specify a imagePullPolicy
+    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
+    ##
+    pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## e.g:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: []
+    debug: false
+  ## @param geoipApi.replicaCount Number of VyHub geoipApi replicas to deploy
+  ##
+  replicaCount: 1
+  ## @param geoipApi.containerPorts.http VyHub geoipApi HTTP container port
+  ##
+  containerPorts:
+    http: 8080
+  ## @param geoipApi.extraContainerPorts Optionally specify extra list of additional ports for VyHub geoipApi containers
+  ## e.g:
+  ## extraContainerPorts:
+  ##   - name: myservice
+  ##     containerPort: 9090
+  ##
+  extraContainerPorts: []
+  ## Configure extra options for VyHub geoipApi containers' liveness and readiness probes
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+  ## @param geoipApi.livenessProbe.enabled Enable livenessProbe on VyHub geoipApi containers
+  ## @param geoipApi.livenessProbe.initialDelaySeconds Initial delay seconds for livenessProbe
+  ## @param geoipApi.livenessProbe.periodSeconds Period seconds for livenessProbe
+  ## @param geoipApi.livenessProbe.timeoutSeconds Timeout seconds for livenessProbe
+  ## @param geoipApi.livenessProbe.failureThreshold Failure threshold for livenessProbe
+  ## @param geoipApi.livenessProbe.successThreshold Success threshold for livenessProbe
+  ##
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+  ## @param geoipApi.readinessProbe.enabled Enable readinessProbe on VyHub geoipApi containers
+  ## @param geoipApi.readinessProbe.initialDelaySeconds Initial delay seconds for readinessProbe
+  ## @param geoipApi.readinessProbe.periodSeconds Period seconds for readinessProbe
+  ## @param geoipApi.readinessProbe.timeoutSeconds Timeout seconds for readinessProbe
+  ## @param geoipApi.readinessProbe.failureThreshold Failure threshold for readinessProbe
+  ## @param geoipApi.readinessProbe.successThreshold Success threshold for readinessProbe
+  ##
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+    successThreshold: 1
+  ## @param geoipApi.startupProbe.enabled Enable startupProbe on VyHub geoipApi containers
+  ## @param geoipApi.startupProbe.initialDelaySeconds Initial delay seconds for startupProbe
+  ## @param geoipApi.startupProbe.periodSeconds Period seconds for startupProbe
+  ## @param geoipApi.startupProbe.timeoutSeconds Timeout seconds for startupProbe
+  ## @param geoipApi.startupProbe.failureThreshold Failure threshold for startupProbe
+  ## @param geoipApi.startupProbe.successThreshold Success threshold for startupProbe
+  ##
+  startupProbe:
+    enabled: true
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 30
+    successThreshold: 1
+  ## @param geoipApi.customLivenessProbe Custom livenessProbe that overrides the default one
+  ##
+  customLivenessProbe: {}
+  ## @param geoipApi.customReadinessProbe Custom readinessProbe that overrides the default one
+  ##
+  customReadinessProbe: {}
+  ## @param geoipApi.customStartupProbe Custom startupProbe that overrides the default one
+  ##
+  customStartupProbe: {}
+  ## VyHub geoipApi resource requests and limits
+  ## ref: http://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  ## @param geoipApi.resourcesPreset Set VyHub geoipApi container resources according to one common preset (allowed values: none, nano, small, medium, large, xlarge, 2xlarge). This is ignored if geoipApi.resources is set (geoipApi.resources is recommended for production).
+  ## More information: https://github.com/bitnami/charts/blob/main/bitnami/common/templates/_resources.tpl#L15
+  ##
+  resourcesPreset: "nano"
+  ## @param geoipApi.resources Set VyHub geoipApi container requests and limits for different resources like CPU or memory (essential for production workloads)
+  ## Example:
+  ## resources:
+  ##   requests:
+  ##     cpu: 2
+  ##     memory: 512Mi
+  ##   limits:
+  ##     cpu: 3
+  ##     memory: 1024Mi
+  ##
+  resources: {}
+  ## Configure Pods Security Context
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
+  ## @param geoipApi.podSecurityContext.enabled Enable VyHub geoipApi pods' Security Context
+  ## @param geoipApi.podSecurityContext.fsGroupChangePolicy Set filesystem group change policy for VyHub geoipApi pods
+  ## @param geoipApi.podSecurityContext.sysctls Set kernel settings using the sysctl interface for VyHub geoipApi pods
+  ## @param geoipApi.podSecurityContext.supplementalGroups Set filesystem extra groups for VyHub geoipApi pods
+  ## @param geoipApi.podSecurityContext.fsGroup Set fsGroup in VyHub geoipApi pods' Security Context
+  ##
+  podSecurityContext:
+    enabled: true
+    fsGroupChangePolicy: Always
+    sysctls: []
+    supplementalGroups: []
+    fsGroup: 1001
+  ## Configure Container Security Context
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+  ## @param geoipApi.containerSecurityContext.enabled Enabled VyHub geoipApi container' Security Context
+  ## @param geoipApi.containerSecurityContext.seLinuxOptions [object,nullable] Set SELinux options in VyHub geoipApi container
+  ## @param geoipApi.containerSecurityContext.runAsUser Set runAsUser in VyHub geoipApi container' Security Context
+  ## @param geoipApi.containerSecurityContext.runAsGroup Set runAsGroup in VyHub geoipApi container' Security Context
+  ## @param geoipApi.containerSecurityContext.runAsNonRoot Set runAsNonRoot in VyHub geoipApi container' Security Context
+  ## @param geoipApi.containerSecurityContext.readOnlyRootFilesystem Set readOnlyRootFilesystem in VyHub geoipApi container' Security Context
+  ## @param geoipApi.containerSecurityContext.privileged Set privileged in VyHub geoipApi container' Security Context
+  ## @param geoipApi.containerSecurityContext.allowPrivilegeEscalation Set allowPrivilegeEscalation in VyHub geoipApi container' Security Context
+  ## @param geoipApi.containerSecurityContext.capabilities.drop List of capabilities to be dropped in VyHub geoipApi container
+  ## @param geoipApi.containerSecurityContext.seccompProfile.type Set seccomp profile in VyHub geoipApi container
+  ##
+  containerSecurityContext:
+    enabled: true
+    seLinuxOptions: {}
+    runAsUser: 1001
+    runAsGroup: 1001
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    privileged: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: "RuntimeDefault"
+  ## @param geoipApi.command Override default VyHub geoipApi container command (useful when using custom images)
+  ##
+  command: []
+  ## @param geoipApi.args Override default VyHub geoipApi container args (useful when using custom images)
+  ##
+  args: []
+  ## @param geoipApi.automountServiceAccountToken Mount Service Account token in VyHub geoipApi pods
+  ##
+  automountServiceAccountToken: false
+  ## @param geoipApi.hostAliases VyHub geoipApi pods host aliases
+  ## https://kubernetes.io/docs/concepts/services-networking/add-entries-to-pod-etc-hosts-with-host-aliases/
+  ##
+  hostAliases: []
+  ## @param geoipApi.daemonsetAnnotations Annotations for VyHub geoipApi daemonset
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  ##
+  daemonsetAnnotations: {}
+  ## @param geoipApi.deploymentAnnotations Annotations for VyHub geoipApi deployment
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  ##
+  deploymentAnnotations: {}
+  ## @param geoipApi.statefulsetAnnotations Annotations for VyHub geoipApi statefulset
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  ##
+  statefulsetAnnotations: {}
+  ## @param geoipApi.podLabels Extra labels for VyHub geoipApi pods
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+  ##
+  podLabels: {}
+  ## @param geoipApi.podAnnotations Annotations for VyHub geoipApi pods
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  ##
+  podAnnotations: {}
+  ## @param geoipApi.podAffinityPreset Pod affinity preset. Ignored if `geoipApi.affinity` is set. Allowed values: `soft` or `hard`
+  ## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity
+  ##
+  podAffinityPreset: ""
+  ## @param geoipApi.podAntiAffinityPreset Pod anti-affinity preset. Ignored if `geoipApi.affinity` is set. Allowed values: `soft` or `hard`
+  ## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity
+  ##
+  podAntiAffinityPreset: soft
+  ## Node geoipApi.affinity preset
+  ## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#node-affinity
+  ##
+  nodeAffinityPreset:
+    ## @param geoipApi.nodeAffinityPreset.type Node affinity preset type. Ignored if `geoipApi.affinity` is set. Allowed values: `soft` or `hard`
+    ##
+    type: ""
+    ## @param geoipApi.nodeAffinityPreset.key Node label key to match. Ignored if `geoipApi.affinity` is set
+    ##
+    key: ""
+    ## @param geoipApi.nodeAffinityPreset.values Node label values to match. Ignored if `geoipApi.affinity` is set
+    ## E.g.
+    ## values:
+    ##   - e2e-az1
+    ##   - e2e-az2
+    ##
+    values: []
+  ## @param geoipApi.affinity Affinity for VyHub geoipApi pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  ## NOTE: `geoipApi.podAffinityPreset`, `geoipApi.podAntiAffinityPreset`, and `geoipApi.nodeAffinityPreset` will be ignored when it's set
+  ##
+  affinity: {}
+  ## @param geoipApi.nodeSelector Node labels for VyHub geoipApi pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+  ##
+  nodeSelector: {}
+  ## @param geoipApi.tolerations Tolerations for VyHub geoipApi pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  ##
+  tolerations: []
+  ## @param geoipApi.updateStrategy.type VyHub geoipApi deployment strategy type
+  ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+  ##
+  updateStrategy:
+    ## Can be set to RollingUpdate or Recreate
+    ##
+    type: RollingUpdate
+  ## @param geoipApi.priorityClassName VyHub geoipApi pods' priorityClassName
+  ##
+  priorityClassName: ""
+  ## @param geoipApi.topologySpreadConstraints Topology Spread Constraints for VyHub geoipApi pod assignment spread across your cluster among failure-domains
+  ## Ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/#spread-constraints-for-pods
+  ##
+  topologySpreadConstraints: []
+  ## @param geoipApi.schedulerName Name of the k8s scheduler (other than default) for VyHub geoipApi pods
+  ## ref: https://kubernetes.io/docs/tasks/administer-cluster/configure-multiple-schedulers/
+  ##
+  schedulerName: ""
+  ## @param geoipApi.terminationGracePeriodSeconds Seconds VyHub geoipApi pods need to terminate gracefully
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods
+  ##
+  terminationGracePeriodSeconds: ""
+  ## @param geoipApi.lifecycleHooks for VyHub geoipApi containers to automate configuration before or after startup
+  ##
+  lifecycleHooks: {}
+  ## @param geoipApi.extraEnvVars Array with extra environment variables to add to VyHub geoipApi containers
+  ## e.g:
+  ## extraEnvVars:
+  ##   - name: FOO
+  ##     value: "bar"
+  ##
+  extraEnvVars: []
+  ## @param geoipApi.extraEnvVarsCM Name of existing ConfigMap containing extra env vars for VyHub geoipApi containers
+  ##
+  extraEnvVarsCM: ""
+  ## @param geoipApi.extraEnvVarsSecret Name of existing Secret containing extra env vars for VyHub geoipApi containers
+  ##
+  extraEnvVarsSecret: ""
+  ## @param geoipApi.extraVolumes Optionally specify extra list of additional volumes for the VyHub geoipApi pods
+  ##
+  extraVolumes: []
+  ## @param geoipApi.extraVolumeMounts Optionally specify extra list of additional volumeMounts for the VyHub geoipApi containers
+  ##
+  extraVolumeMounts: []
+  ## @param geoipApi.sidecars Add additional sidecar containers to the VyHub geoipApi pods
+  ## e.g:
+  ## sidecars:
+  ##   - name: your-image-name
+  ##     image: your-image
+  ##     imagePullPolicy: Always
+  ##     ports:
+  ##       - name: portname
+  ##         containerPort: 1234
+  ##
+  sidecars: []
+  ## @param geoipApi.initContainers Add additional init containers to the VyHub geoipApi pods
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
+  ## e.g:
+  ## initContainers:
+  ##  - name: your-image-name
+  ##    image: your-image
+  ##    imagePullPolicy: Always
+  ##    command: ['sh', '-c', 'echo "hello world"']
+  ##
+  initContainers: []
+  ## Pod Disruption Budget configuration
+  ## ref: https://kubernetes.io/docs/tasks/run-geoipApilication/configure-pdb
+  ## @param geoipApi.pdb.create Enable/disable a Pod Disruption Budget creation
+  ## @param geoipApi.pdb.minAvailable Minimum number/percentage of pods that should remain scheduled
+  ## @param geoipApi.pdb.maxUnavailable Maximum number/percentage of pods that may be made unavailable. Defaults to `1` if both `geoipApi.pdb.minAvailable` and `geoipApi.pdb.maxUnavailable` are empty.
+  ##
+  pdb:
+    create: true
+    minAvailable: ""
+    maxUnavailable: ""
+  ## Autoscaling configuration
+  ## ref: https://kubernetes.io/docs/concepts/workloads/autoscaling/
+  ##
+  autoscaling:
+    ## @param geoipApi.autoscaling.vpa.enabled Enable VPA for VyHub geoipApi pods
+    ## @param geoipApi.autoscaling.vpa.annotations Annotations for VPA resource
+    ## @param geoipApi.autoscaling.vpa.controlledResources VPA List of resources that the vertical pod autoscaler can control. Defaults to cpu and memory
+    ## @param geoipApi.autoscaling.vpa.maxAllowed VPA Max allowed resources for the pod
+    ## @param geoipApi.autoscaling.vpa.minAllowed VPA Min allowed resources for the pod
+    ##
+    vpa:
+      enabled: false
+      annotations: {}
+      controlledResources: []
+      maxAllowed: {}
+      minAllowed: {}
+      ## @param geoipApi.autoscaling.vpa.updatePolicy.updateMode Autoscaling update policy
+      ## Specifies whether recommended updates are geoipApilied when a Pod is started and whether recommended updates are geoipApilied during the life of a Pod
+      ## Possible values are "Off", "Initial", "Recreate", and "Auto".
+      ##
+      updatePolicy:
+        updateMode: Auto
+    ## @param geoipApi.autoscaling.hpa.enabled Enable HPA for VyHub geoipApi pods
+    ## @param geoipApi.autoscaling.hpa.minReplicas Minimum number of replicas
+    ## @param geoipApi.autoscaling.hpa.maxReplicas Maximum number of replicas
+    ## @param geoipApi.autoscaling.hpa.targetCPU Target CPU utilization percentage
+    ## @param geoipApi.autoscaling.hpa.targetMemory Target Memory utilization percentage
+    ##
+    hpa:
+      enabled: false
+      minReplicas: ""
+      maxReplicas: ""
+      targetCPU: ""
+      targetMemory: ""
+  ## ServiceAccount configuration
+  ##
+  serviceAccount:
+    ## @param geoipApi.serviceAccount.create Specifies whether a ServiceAccount should be created
+    ##
+    create: true
+    ## @param geoipApi.serviceAccount.name The name of the ServiceAccount to use.
+    ## If not set and create is true, a name is generated using the common.names.fullname template
+    ##
+    name: ""
+    ## @param geoipApi.serviceAccount.annotations Additional Service Account annotations (evaluated as a template)
+    ##
+    annotations: {}
+    ## @param geoipApi.serviceAccount.automountServiceAccountToken Automount service account token for the server service account
+    ##
+    automountServiceAccountToken: true
+  ## RBAC configuration
+  ##
+  rbac:
+    ## @param geoipApi.rbac.create Specifies whether RBAC resources should be created
+    ##
+    create: false
+    ## @param geoipApi.rbac.rules Custom RBAC rules to set
+    ## e.g:
+    ## rules:
+    ##   - apiGroups:
+    ##       - ""
+    ##     resources:
+    ##       - pods
+    ##     verbs:
+    ##       - get
+    ##       - list
+    ##
+    rules: []
+  ## VyHub geoipApi service parameters
+  ##
+  service:
+    ## @param geoipApi.service.type geoipApi frontend service type
+    ##
+    type: ClusterIP
+    ## @param geoipApi.service.ports.http geoipApi frontend service HTTP port
+    ##
+    ports:
+      http: 8080
+    ## Node ports to expose
+    ## @param geoipApi.service.nodePorts.http Node port for HTTP
+    ## NOTE: choose port between <30000-32767>
+    ##
+    nodePorts:
+      http: ""
+    ## @param geoipApi.service.clusterIP VyHub geoipApi service Cluster IP
+    ## e.g.:
+    ## clusterIP: None
+    ##
+    clusterIP: ""
+    ## @param geoipApi.service.loadBalancerIP VyHub geoipApi service Load Balancer IP
+    ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#type-loadbalancer
+    ##
+    loadBalancerIP: ""
+    ## @param geoipApi.service.loadBalancerSourceRanges VyHub geoipApi service Load Balancer sources
+    ## ref: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/#restrict-access-for-loadbalancer-service
+    ## e.g:
+    ## loadBalancerSourceRanges:
+    ##   - 10.10.10.0/24
+    ##
+    loadBalancerSourceRanges: []
+    ## @param geoipApi.service.externalTrafficPolicy VyHub geoipApi service external traffic policy
+    ## ref http://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
+    ##
+    externalTrafficPolicy: Cluster
+    ## @param geoipApi.service.annotations Additional custom annotations for VyHub geoipApi service
+    ##
+    annotations: {}
+    ## @param geoipApi.service.extraPorts Extra ports to expose in VyHub geoipApi service (normally used with the `sidecars` value)
+    ##
+    extraPorts: []
+    ## @param geoipApi.service.sessionAffinity Control where client requests go, to the same pod or round-robin
+    ## Values: ClientIP or None
+    ## ref: https://kubernetes.io/docs/concepts/services-networking/service/
+    ##
+    sessionAffinity: None
+    ## @param geoipApi.service.sessionAffinityConfig Additional settings for the sessionAffinity
+    ## sessionAffinityConfig:
+    ##   clientIP:
+    ##     timeoutSeconds: 300
+    ##
+    sessionAffinityConfig: {}
+
+## @section VyHub PDF API Parameters
+##
+
+pdfApi:
+  ## VyHub PDF API container image
+  ## @param pdfApi.image.registry VyHub pdfApi image registry
+  ## @param pdfApi.image.repository VyHub pdfApi image repository
+  ## @skip pdfApi.image.tag VyHub pdfApi image tag (immutable tags are recommended)
+  ## @param pdfApi.image.digest VyHub pdfApi image digest in the way sha256:aa.... Please note this parameter, if set, will override the tag image tag (immutable tags are recommended)
+  ## @param pdfApi.image.pullPolicy VyHub pdfApi image pull policy
+  ## @param pdfApi.image.pullSecrets VyHub pdfApi image pull secrets
+  ## @param pdfApi.image.debug Enable VyHub pdfApi image debug mode
+  ##
+  image:
+    registry: ghcr.io
+    repository: matbyte-com/htmltopdf-api
+    tag: 1.0.0
+    digest: ""
+    ## Specify a imagePullPolicy
+    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
+    ##
+    pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## e.g:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: []
+    debug: false
+  ## @param pdfApi.replicaCount Number of VyHub pdfApi replicas to deploy
+  ##
+  replicaCount: 1
+  ## @param pdfApi.containerPorts.http VyHub pdfApi HTTP container port
+  ##
+  containerPorts:
+    http: 9090
+  ## @param pdfApi.extraContainerPorts Optionally specify extra list of additional ports for VyHub pdfApi containers
+  ## e.g:
+  ## extraContainerPorts:
+  ##   - name: myservice
+  ##     containerPort: 9090
+  ##
+  extraContainerPorts: []
+  ## Configure extra options for VyHub pdfApi containers' liveness and readiness probes
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+  ## @param pdfApi.livenessProbe.enabled Enable livenessProbe on VyHub pdfApi containers
+  ## @param pdfApi.livenessProbe.initialDelaySeconds Initial delay seconds for livenessProbe
+  ## @param pdfApi.livenessProbe.periodSeconds Period seconds for livenessProbe
+  ## @param pdfApi.livenessProbe.timeoutSeconds Timeout seconds for livenessProbe
+  ## @param pdfApi.livenessProbe.failureThreshold Failure threshold for livenessProbe
+  ## @param pdfApi.livenessProbe.successThreshold Success threshold for livenessProbe
+  ##
+  livenessProbe:
+    enabled: false
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+  ## @param pdfApi.readinessProbe.enabled Enable readinessProbe on VyHub pdfApi containers
+  ## @param pdfApi.readinessProbe.initialDelaySeconds Initial delay seconds for readinessProbe
+  ## @param pdfApi.readinessProbe.periodSeconds Period seconds for readinessProbe
+  ## @param pdfApi.readinessProbe.timeoutSeconds Timeout seconds for readinessProbe
+  ## @param pdfApi.readinessProbe.failureThreshold Failure threshold for readinessProbe
+  ## @param pdfApi.readinessProbe.successThreshold Success threshold for readinessProbe
+  ##
+  readinessProbe:
+    enabled: false
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+    successThreshold: 1
+  ## @param pdfApi.startupProbe.enabled Enable startupProbe on VyHub pdfApi containers
+  ## @param pdfApi.startupProbe.initialDelaySeconds Initial delay seconds for startupProbe
+  ## @param pdfApi.startupProbe.periodSeconds Period seconds for startupProbe
+  ## @param pdfApi.startupProbe.timeoutSeconds Timeout seconds for startupProbe
+  ## @param pdfApi.startupProbe.failureThreshold Failure threshold for startupProbe
+  ## @param pdfApi.startupProbe.successThreshold Success threshold for startupProbe
+  ##
+  startupProbe:
+    enabled: false
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 30
+    successThreshold: 1
+  ## @param pdfApi.customLivenessProbe Custom livenessProbe that overrides the default one
+  ##
+  customLivenessProbe: {}
+  ## @param pdfApi.customReadinessProbe Custom readinessProbe that overrides the default one
+  ##
+  customReadinessProbe: {}
+  ## @param pdfApi.customStartupProbe Custom startupProbe that overrides the default one
+  ##
+  customStartupProbe: {}
+  ## VyHub pdfApi resource requests and limits
+  ## ref: http://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  ## @param pdfApi.resourcesPreset Set VyHub pdfApi container resources according to one common preset (allowed values: none, nano, small, medium, large, xlarge, 2xlarge). This is ignored if pdfApi.resources is set (pdfApi.resources is recommended for production).
+  ## More information: https://github.com/bitnami/charts/blob/main/bitnami/common/templates/_resources.tpl#L15
+  ##
+  resourcesPreset: "nano"
+  ## @param pdfApi.resources Set VyHub pdfApi container requests and limits for different resources like CPU or memory (essential for production workloads)
+  ## Example:
+  ## resources:
+  ##   requests:
+  ##     cpu: 2
+  ##     memory: 512Mi
+  ##   limits:
+  ##     cpu: 3
+  ##     memory: 1024Mi
+  ##
+  resources: {}
+  ## Configure Pods Security Context
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
+  ## @param pdfApi.podSecurityContext.enabled Enable VyHub pdfApi pods' Security Context
+  ## @param pdfApi.podSecurityContext.fsGroupChangePolicy Set filesystem group change policy for VyHub pdfApi pods
+  ## @param pdfApi.podSecurityContext.sysctls Set kernel settings using the sysctl interface for VyHub pdfApi pods
+  ## @param pdfApi.podSecurityContext.supplementalGroups Set filesystem extra groups for VyHub pdfApi pods
+  ## @param pdfApi.podSecurityContext.fsGroup Set fsGroup in VyHub pdfApi pods' Security Context
+  ##
+  podSecurityContext:
+    enabled: true
+    fsGroupChangePolicy: Always
+    sysctls: []
+    supplementalGroups: []
+    fsGroup: 1001
+  ## Configure Container Security Context
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+  ## @param pdfApi.containerSecurityContext.enabled Enabled VyHub pdfApi container' Security Context
+  ## @param pdfApi.containerSecurityContext.seLinuxOptions [object,nullable] Set SELinux options in VyHub pdfApi container
+  ## @param pdfApi.containerSecurityContext.runAsUser Set runAsUser in VyHub pdfApi container' Security Context
+  ## @param pdfApi.containerSecurityContext.runAsGroup Set runAsGroup in VyHub pdfApi container' Security Context
+  ## @param pdfApi.containerSecurityContext.runAsNonRoot Set runAsNonRoot in VyHub pdfApi container' Security Context
+  ## @param pdfApi.containerSecurityContext.readOnlyRootFilesystem Set readOnlyRootFilesystem in VyHub pdfApi container' Security Context
+  ## @param pdfApi.containerSecurityContext.privileged Set privileged in VyHub pdfApi container' Security Context
+  ## @param pdfApi.containerSecurityContext.allowPrivilegeEscalation Set allowPrivilegeEscalation in VyHub pdfApi container' Security Context
+  ## @param pdfApi.containerSecurityContext.capabilities.drop List of capabilities to be dropped in VyHub pdfApi container
+  ## @param pdfApi.containerSecurityContext.seccompProfile.type Set seccomp profile in VyHub pdfApi container
+  ##
+  containerSecurityContext:
+    enabled: true
+    seLinuxOptions: {}
+    runAsUser: 1001
+    runAsGroup: 1001
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    privileged: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: "RuntimeDefault"
+  ## @param pdfApi.command Override default VyHub pdfApi container command (useful when using custom images)
+  ##
+  command: []
+  ## @param pdfApi.args Override default VyHub pdfApi container args (useful when using custom images)
+  ##
+  args: []
+  ## @param pdfApi.automountServiceAccountToken Mount Service Account token in VyHub pdfApi pods
+  ##
+  automountServiceAccountToken: false
+  ## @param pdfApi.hostAliases VyHub pdfApi pods host aliases
+  ## https://kubernetes.io/docs/concepts/services-networking/add-entries-to-pod-etc-hosts-with-host-aliases/
+  ##
+  hostAliases: []
+  ## @param pdfApi.daemonsetAnnotations Annotations for VyHub pdfApi daemonset
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  ##
+  daemonsetAnnotations: {}
+  ## @param pdfApi.deploymentAnnotations Annotations for VyHub pdfApi deployment
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  ##
+  deploymentAnnotations: {}
+  ## @param pdfApi.statefulsetAnnotations Annotations for VyHub pdfApi statefulset
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  ##
+  statefulsetAnnotations: {}
+  ## @param pdfApi.podLabels Extra labels for VyHub pdfApi pods
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+  ##
+  podLabels: {}
+  ## @param pdfApi.podAnnotations Annotations for VyHub pdfApi pods
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  ##
+  podAnnotations: {}
+  ## @param pdfApi.podAffinityPreset Pod affinity preset. Ignored if `pdfApi.affinity` is set. Allowed values: `soft` or `hard`
+  ## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity
+  ##
+  podAffinityPreset: ""
+  ## @param pdfApi.podAntiAffinityPreset Pod anti-affinity preset. Ignored if `pdfApi.affinity` is set. Allowed values: `soft` or `hard`
+  ## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity
+  ##
+  podAntiAffinityPreset: soft
+  ## Node pdfApi.affinity preset
+  ## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#node-affinity
+  ##
+  nodeAffinityPreset:
+    ## @param pdfApi.nodeAffinityPreset.type Node affinity preset type. Ignored if `pdfApi.affinity` is set. Allowed values: `soft` or `hard`
+    ##
+    type: ""
+    ## @param pdfApi.nodeAffinityPreset.key Node label key to match. Ignored if `pdfApi.affinity` is set
+    ##
+    key: ""
+    ## @param pdfApi.nodeAffinityPreset.values Node label values to match. Ignored if `pdfApi.affinity` is set
+    ## E.g.
+    ## values:
+    ##   - e2e-az1
+    ##   - e2e-az2
+    ##
+    values: []
+  ## @param pdfApi.affinity Affinity for VyHub pdfApi pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  ## NOTE: `pdfApi.podAffinityPreset`, `pdfApi.podAntiAffinityPreset`, and `pdfApi.nodeAffinityPreset` will be ignored when it's set
+  ##
+  affinity: {}
+  ## @param pdfApi.nodeSelector Node labels for VyHub pdfApi pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+  ##
+  nodeSelector: {}
+  ## @param pdfApi.tolerations Tolerations for VyHub pdfApi pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  ##
+  tolerations: []
+  ## @param pdfApi.updateStrategy.type VyHub pdfApi deployment strategy type
+  ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+  ##
+  updateStrategy:
+    ## Can be set to RollingUpdate or Recreate
+    ##
+    type: RollingUpdate
+  ## @param pdfApi.priorityClassName VyHub pdfApi pods' priorityClassName
+  ##
+  priorityClassName: ""
+  ## @param pdfApi.topologySpreadConstraints Topology Spread Constraints for VyHub pdfApi pod assignment spread across your cluster among failure-domains
+  ## Ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/#spread-constraints-for-pods
+  ##
+  topologySpreadConstraints: []
+  ## @param pdfApi.schedulerName Name of the k8s scheduler (other than default) for VyHub pdfApi pods
+  ## ref: https://kubernetes.io/docs/tasks/administer-cluster/configure-multiple-schedulers/
+  ##
+  schedulerName: ""
+  ## @param pdfApi.terminationGracePeriodSeconds Seconds VyHub pdfApi pods need to terminate gracefully
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods
+  ##
+  terminationGracePeriodSeconds: ""
+  ## @param pdfApi.lifecycleHooks for VyHub pdfApi containers to automate configuration before or after startup
+  ##
+  lifecycleHooks: {}
+  ## @param pdfApi.extraEnvVars Array with extra environment variables to add to VyHub pdfApi containers
+  ## e.g:
+  ## extraEnvVars:
+  ##   - name: FOO
+  ##     value: "bar"
+  ##
+  extraEnvVars: []
+  ## @param pdfApi.extraEnvVarsCM Name of existing ConfigMap containing extra env vars for VyHub pdfApi containers
+  ##
+  extraEnvVarsCM: ""
+  ## @param pdfApi.extraEnvVarsSecret Name of existing Secret containing extra env vars for VyHub pdfApi containers
+  ##
+  extraEnvVarsSecret: ""
+  ## @param pdfApi.extraVolumes Optionally specify extra list of additional volumes for the VyHub pdfApi pods
+  ##
+  extraVolumes: []
+  ## @param pdfApi.extraVolumeMounts Optionally specify extra list of additional volumeMounts for the VyHub pdfApi containers
+  ##
+  extraVolumeMounts: []
+  ## @param pdfApi.sidecars Add additional sidecar containers to the VyHub pdfApi pods
+  ## e.g:
+  ## sidecars:
+  ##   - name: your-image-name
+  ##     image: your-image
+  ##     imagePullPolicy: Always
+  ##     ports:
+  ##       - name: portname
+  ##         containerPort: 1234
+  ##
+  sidecars: []
+  ## @param pdfApi.initContainers Add additional init containers to the VyHub pdfApi pods
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
+  ## e.g:
+  ## initContainers:
+  ##  - name: your-image-name
+  ##    image: your-image
+  ##    imagePullPolicy: Always
+  ##    command: ['sh', '-c', 'echo "hello world"']
+  ##
+  initContainers: []
+  ## Pod Disruption Budget configuration
+  ## ref: https://kubernetes.io/docs/tasks/run-pdfApilication/configure-pdb
+  ## @param pdfApi.pdb.create Enable/disable a Pod Disruption Budget creation
+  ## @param pdfApi.pdb.minAvailable Minimum number/percentage of pods that should remain scheduled
+  ## @param pdfApi.pdb.maxUnavailable Maximum number/percentage of pods that may be made unavailable. Defaults to `1` if both `pdfApi.pdb.minAvailable` and `pdfApi.pdb.maxUnavailable` are empty.
+  ##
+  pdb:
+    create: true
+    minAvailable: ""
+    maxUnavailable: ""
+  ## Autoscaling configuration
+  ## ref: https://kubernetes.io/docs/concepts/workloads/autoscaling/
+  ##
+  autoscaling:
+    ## @param pdfApi.autoscaling.vpa.enabled Enable VPA for VyHub pdfApi pods
+    ## @param pdfApi.autoscaling.vpa.annotations Annotations for VPA resource
+    ## @param pdfApi.autoscaling.vpa.controlledResources VPA List of resources that the vertical pod autoscaler can control. Defaults to cpu and memory
+    ## @param pdfApi.autoscaling.vpa.maxAllowed VPA Max allowed resources for the pod
+    ## @param pdfApi.autoscaling.vpa.minAllowed VPA Min allowed resources for the pod
+    ##
+    vpa:
+      enabled: false
+      annotations: {}
+      controlledResources: []
+      maxAllowed: {}
+      minAllowed: {}
+      ## @param pdfApi.autoscaling.vpa.updatePolicy.updateMode Autoscaling update policy
+      ## Specifies whether recommended updates are pdfApilied when a Pod is started and whether recommended updates are pdfApilied during the life of a Pod
+      ## Possible values are "Off", "Initial", "Recreate", and "Auto".
+      ##
+      updatePolicy:
+        updateMode: Auto
+    ## @param pdfApi.autoscaling.hpa.enabled Enable HPA for VyHub pdfApi pods
+    ## @param pdfApi.autoscaling.hpa.minReplicas Minimum number of replicas
+    ## @param pdfApi.autoscaling.hpa.maxReplicas Maximum number of replicas
+    ## @param pdfApi.autoscaling.hpa.targetCPU Target CPU utilization percentage
+    ## @param pdfApi.autoscaling.hpa.targetMemory Target Memory utilization percentage
+    ##
+    hpa:
+      enabled: false
+      minReplicas: ""
+      maxReplicas: ""
+      targetCPU: ""
+      targetMemory: ""
+  ## ServiceAccount configuration
+  ##
+  serviceAccount:
+    ## @param pdfApi.serviceAccount.create Specifies whether a ServiceAccount should be created
+    ##
+    create: true
+    ## @param pdfApi.serviceAccount.name The name of the ServiceAccount to use.
+    ## If not set and create is true, a name is generated using the common.names.fullname template
+    ##
+    name: ""
+    ## @param pdfApi.serviceAccount.annotations Additional Service Account annotations (evaluated as a template)
+    ##
+    annotations: {}
+    ## @param pdfApi.serviceAccount.automountServiceAccountToken Automount service account token for the server service account
+    ##
+    automountServiceAccountToken: true
+  ## RBAC configuration
+  ##
+  rbac:
+    ## @param pdfApi.rbac.create Specifies whether RBAC resources should be created
+    ##
+    create: false
+    ## @param pdfApi.rbac.rules Custom RBAC rules to set
+    ## e.g:
+    ## rules:
+    ##   - apiGroups:
+    ##       - ""
+    ##     resources:
+    ##       - pods
+    ##     verbs:
+    ##       - get
+    ##       - list
+    ##
+    rules: []
+  ## VyHub pdfApi service parameters
+  ##
+  service:
+    ## @param pdfApi.service.type VyHub pdfApi service type
+    ##
+    type: ClusterIP
+    ## @param pdfApi.service.ports.http VyHub pdfApi service HTTP port
+    ##
+    ports:
+      http: 9090
+    ## Node ports to expose
+    ## @param pdfApi.service.nodePorts.http Node port for HTTP
+    ## NOTE: choose port between <30000-32767>
+    ##
+    nodePorts:
+      http: ""
+    ## @param pdfApi.service.clusterIP VyHub pdfApi service Cluster IP
+    ## e.g.:
+    ## clusterIP: None
+    ##
+    clusterIP: ""
+    ## @param pdfApi.service.loadBalancerIP VyHub pdfApi service Load Balancer IP
+    ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#type-loadbalancer
+    ##
+    loadBalancerIP: ""
+    ## @param pdfApi.service.loadBalancerSourceRanges VyHub pdfApi service Load Balancer sources
+    ## ref: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/#restrict-access-for-loadbalancer-service
+    ## e.g:
+    ## loadBalancerSourceRanges:
+    ##   - 10.10.10.0/24
+    ##
+    loadBalancerSourceRanges: []
+    ## @param pdfApi.service.externalTrafficPolicy VyHub pdfApi service external traffic policy
+    ## ref http://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
+    ##
+    externalTrafficPolicy: Cluster
+    ## @param pdfApi.service.annotations Additional custom annotations for VyHub pdfApi service
+    ##
+    annotations: {}
+    ## @param pdfApi.service.extraPorts Extra ports to expose in VyHub pdfApi service (normally used with the `sidecars` value)
+    ##
+    extraPorts: []
+    ## @param pdfApi.service.sessionAffinity Control where client requests go, to the same pod or round-robin
+    ## Values: ClientIP or None
+    ## ref: https://kubernetes.io/docs/concepts/services-networking/service/
+    ##
+    sessionAffinity: None
+    ## @param pdfApi.service.sessionAffinityConfig Additional settings for the sessionAffinity
+    ## sessionAffinityConfig:
+    ##   clientIP:
+    ##     timeoutSeconds: 300
+    ##
+    sessionAffinityConfig: {}
+
+## @section Traffic Exposure Parameters
+##
+
+# TODO: Network Policy
+
+## VyHub ingress parameters
+## ref: http://kubernetes.io/docs/concepts/services-networking/ingress/
+##
+ingress:
+  ## @param ingress.enabled Enable ingress record generation for VyHub
+  ##
+  enabled: false
+  ## @param ingress.pathType Ingress path type
+  ##
+  pathType: Prefix
+  ## @param ingress.apiVersion Force Ingress API version (automatically detected if not set)
+  ##
+  apiVersion: ""
+  ## @param ingress.hostname Default host for the ingress record
+  ##
+  hostname: vyhub.local
+  ## @param ingress.ingressClassName IngressClass that will be be used to implement the Ingress (Kubernetes 1.18+)
+  ## This is supported in Kubernetes 1.18+ and required if you have more than one IngressClass marked as the default for your cluster .
+  ## ref: https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/
+  ##
+  ingressClassName: ""
+  ## @param ingress.path Ingress path for VyHub frontend
+  ## NOTE: You may need to set this to '/*' in order to use this with ALB ingress controllers
+  ##
+  path: /
+  ## @param ingress.appPath Ingress path for VyHub app
+  ## NOTE: The VyHub app is required to be reachable at vyhub.local/api/
+  ##
+  appPath: /api/
+  ## @param ingress.annotations Additional annotations for the Ingress resource. To enable certificate autogeneration, place here your cert-manager annotations.
+  ## Use this parameter to set the required annotations for cert-manager, see
+  ## ref: https://cert-manager.io/docs/usage/ingress/#supported-annotations
+  ## e.g:
+  ## annotations:
+  ##   kubernetes.io/ingress.class: nginx
+  ##   cert-manager.io/cluster-issuer: cluster-issuer-name
+  ##
+  annotations: {}
+  ## @param ingress.tls Enable TLS configuration for the host defined at `ingress.hostname` parameter
+  ## TLS certificates will be retrieved from a TLS secret with name: `{{- printf "%s-tls" .Values.ingress.hostname }}`
+  ## You can:
+  ##   - Use the `ingress.secrets` parameter to create this TLS secret
+  ##   - Rely on cert-manager to create it by setting the corresponding annotations
+  ##   - Rely on Helm to create self-signed certificates by setting `ingress.selfSigned=true`
+  ##
+  tls: false
+  ## @param ingress.selfSigned Create a TLS secret for this ingress record using self-signed certificates generated by Helm
+  ##
+  selfSigned: false
+  ## @param ingress.extraHosts An array with additional hostname(s) to be covered with the ingress record
+  ## e.g:
+  ## extraHosts:
+  ##   - name: app.local
+  ##     path: /
+  ##     appPath: /api
+  ##
+  extraHosts: []
+  ## @param ingress.extraPaths An array with additional arbitrary paths that may need to be added to the ingress under the main host
+  ## e.g:
+  ## extraPaths:
+  ## - path: /*
+  ##   backend:
+  ##     serviceName: ssl-redirect
+  ##     servicePort: use-annotation
+  ##
+  extraPaths: []
+  ## @param ingress.extraTls TLS configuration for additional hostname(s) to be covered with this ingress record
+  ## ref: https://kubernetes.io/docs/concepts/services-networking/ingress/#tls
+  ## e.g:
+  ## extraTls:
+  ## - hosts:
+  ##     - app.local
+  ##   secretName: app.local-tls
+  ##
+  extraTls: []
+  ## @param ingress.secrets Custom TLS certificates as secrets
+  ## NOTE: 'key' and 'certificate' are expected in PEM format
+  ## NOTE: 'name' should line up with a 'secretName' set further up
+  ## If it is not set and you're using cert-manager, this is unneeded, as it will create a secret for you with valid certificates
+  ## If it is not set and you're NOT using cert-manager either, self-signed certificates will be created valid for 365 days
+  ## It is also possible to create and manage the certificates outside of this helm chart
+  ## Please see README.md for more information
+  ## e.g:
+  ## secrets:
+  ##   - name: app.local-tls
+  ##     key: |-
+  ##       -----BEGIN RSA PRIVATE KEY-----
+  ##       ...
+  ##       -----END RSA PRIVATE KEY-----
+  ##     certificate: |-
+  ##       -----BEGIN CERTIFICATE-----
+  ##       ...
+  ##       -----END CERTIFICATE-----
+  ##
+  secrets: []
+  ## @param ingress.extraRules Additional rules to be covered with this ingress record
+  ## ref: https://kubernetes.io/docs/concepts/services-networking/ingress/#ingress-rules
+  ## e.g:
+  ## extraRules:
+  ## - host: example.local
+  ##     http:
+  ##       path: /
+  ##       backend:
+  ##         service:
+  ##           name: example-svc
+  ##           port:
+  ##             name: http
+  ##
+  extraRules: []
+
+## @section Persistence Parameters
+##
+
+## Enable persistence using Persistent Volume Claims
+## ref: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
+##
+persistence:
+  ## @param persistence.enabled Enable persistence using Persistent Volume Claims
+  ##
+  enabled: false
+
+  ## @param persistence.web.existingClaim Name of an existing PVC to use
+  ## @param persistence.web.storageClass PVC Storage Class for vyhub-web volume
+  ## Note: The default StorageClass will be used if not defined. Set it to `-` to disable dynamic provisioning
+  ## @param persistence.web.subPath The sub path used in the volume
+  ## @param persistence.web.accessModes The access mode of the volume
+  ## @param persistence.web.size The size of the volume
+  ## @param persistence.web.annotations Annotations for the PVC
+  ## @param persistence.web.selector Selector to match an existing Persistent Volume
+  web:
+    existingClaim: ""
+    storageClass: ""
+    subPath: ""
+    accessModes:
+      - ReadWriteOnce
+    size: 5Gi
+    annotations: {}
+    selector: {}
+
+## @section Init Container Parameters
+##
+
+## 'volumePermissions' init container parameters
+## Changes the owner and group of the persistent volume mount point to runAsUser:fsGroup values
+##   based on the *podSecurityContext/*containerSecurityContext parameters
+##
+volumePermissions:
+  ## @param volumePermissions.enabled Enable init container that changes the owner/group of the PV mount point to `runAsUser:fsGroup`
+  ##
+  enabled: false
+  ## OS Shell + Utility image
+  ## ref: https://hub.docker.com/r/bitnami/os-shell/tags/
+  ## @param volumePermissions.image.registry [default: REGISTRY_NAME] OS Shell + Utility image registry
+  ## @param volumePermissions.image.repository [default: REPOSITORY_NAME/os-shell] OS Shell + Utility image repository
+  ## @skip volumePermissions.image.tag OS Shell + Utility image tag (immutable tags are recommended)
+  ## @param volumePermissions.image.pullPolicy OS Shell + Utility image pull policy
+  ## @param volumePermissions.image.pullSecrets OS Shell + Utility image pull secrets
+  ##
+  image:
+    registry: docker.io
+    repository: bitnami/os-shell
+    tag: 12-debian-12-r31
+    pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## e.g:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: []
+  ## Init container's resource requests and limits
+  ## ref: http://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  ## @param volumePermissions.resourcesPreset Set init container resources according to one common preset (allowed values: none, nano, small, medium, large, xlarge, 2xlarge). This is ignored if volumePermissions.resources is set (volumePermissions.resources is recommended for production).
+  ## More information: https://github.com/bitnami/charts/blob/main/bitnami/common/templates/_resources.tpl#L15
+  ##
+  resourcesPreset: "nano"
+  ## @param volumePermissions.resources Set init container requests and limits for different resources like CPU or memory (essential for production workloads)
+  ## Example:
+  ## resources:
+  ##   requests:
+  ##     cpu: 2
+  ##     memory: 512Mi
+  ##   limits:
+  ##     cpu: 3
+  ##     memory: 1024Mi
+  ##
+  resources: {}
+  ## Init container Container Security Context
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+  ## @param volumePermissions.containerSecurityContext.enabled Enabled init container' Security Context
+  ## @param volumePermissions.containerSecurityContext.seLinuxOptions [object,nullable] Set SELinux options in init container
+  ## @param volumePermissions.containerSecurityContext.runAsUser Set init container's Security Context runAsUser
+  ## NOTE: when runAsUser is set to special value "auto", init container will try to chown the
+  ##   data folder to auto-determined user&group, using commands: `id -u`:`id -G | cut -d" " -f2`
+  ##   "auto" is especially useful for OpenShift which has scc with dynamic user ids (and 0 is not allowed)
+  ##
+  containerSecurityContext:
+    enabled: true
+    seLinuxOptions: {}
+    runAsUser: 0
+## @section Other Parameters
+##

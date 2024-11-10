@@ -1,0 +1,175 @@
+apiVersion: {{ include "common.capabilities.deployment.apiVersion" . }}
+kind: Deployment
+metadata:
+  name: {{ template "vyhub.pdfApi.name" . }}
+  namespace: {{ include "common.names.namespace" . | quote }}
+  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: pdf-api
+  {{- if or .Values.pdfApi.deploymentAnnotations .Values.commonAnnotations }}
+  {{- $annotations := include "common.tplvalues.merge" (dict "values" (list .Values.pdfApi.deploymentAnnotations .Values.commonAnnotations) "context" .) }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" $annotations "context" $ ) | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if not .Values.pdfApi.autoscaling.hpa.enabled }}
+  replicas: {{ .Values.pdfApi.replicaCount }}
+  {{- end }}
+  {{- if .Values.pdfApi.updateStrategy }}
+  strategy: {{- toYaml .Values.pdfApi.updateStrategy | nindent 4 }}
+  {{- end }}
+  {{- $podLabels := include "common.tplvalues.merge" (dict "values" (list .Values.pdfApi.podLabels .Values.commonLabels) "context" .) }}
+  selector:
+    matchLabels: {{- include "common.labels.matchLabels" ( dict "customLabels" $podLabels "context" $ ) | nindent 6 }}
+      app.kubernetes.io/component: pdf-api
+  template:
+    metadata:
+      {{- if .Values.pdfApi.podAnnotations }}
+      annotations: {{- include "common.tplvalues.render" (dict "value" .Values.pdfApi.podAnnotations "context" $) | nindent 8 }}
+      {{- end }}
+      labels: {{- include "common.labels.standard" ( dict "customLabels" $podLabels "context" $ ) | nindent 8 }}
+        app.kubernetes.io/component: pdf-api
+    spec:
+      {{- include "vyhub.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ template "vyhub.pdfApi.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.pdfApi.automountServiceAccountToken }}
+      {{- if .Values.pdfApi.hostAliases }}
+      hostAliases: {{- include "common.tplvalues.render" (dict "value" .Values.pdfApi.hostAliases "context" $) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.pdfApi.affinity }}
+      affinity: {{- include "common.tplvalues.render" ( dict "value" .Values.pdfApi.affinity "context" $) | nindent 8 }}
+      {{- else }}
+      affinity:
+        podAffinity: {{- include "common.affinities.pods" (dict "type" .Values.pdfApi.podAffinityPreset "component" "pdfApi" "customLabels" $podLabels "context" $) | nindent 10 }}
+        podAntiAffinity: {{- include "common.affinities.pods" (dict "type" .Values.pdfApi.podAntiAffinityPreset "component" "pdfApi" "customLabels" $podLabels "context" $) | nindent 10 }}
+        nodeAffinity: {{- include "common.affinities.nodes" (dict "type" .Values.pdfApi.nodeAffinityPreset.type "key" .Values.pdfApi.nodeAffinityPreset.key "values" .Values.pdfApi.nodeAffinityPreset.values) | nindent 10 }}
+      {{- end }}
+      {{- if .Values.pdfApi.nodeSelector }}
+      nodeSelector: {{- include "common.tplvalues.render" ( dict "value" .Values.pdfApi.nodeSelector "context" $) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.pdfApi.tolerations }}
+      tolerations: {{- include "common.tplvalues.render" (dict "value" .Values.pdfApi.tolerations "context" .) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.pdfApi.priorityClassName }}
+      priorityClassName: {{ .Values.pdfApi.priorityClassName | quote }}
+      {{- end }}
+      {{- if .Values.pdfApi.schedulerName }}
+      schedulerName: {{ .Values.pdfApi.schedulerName | quote }}
+      {{- end }}
+      {{- if .Values.pdfApi.topologySpreadConstraints }}
+      topologySpreadConstraints: {{- include "common.tplvalues.render" (dict "value" .Values.pdfApi.topologySpreadConstraints "context" .) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.pdfApi.podSecurityContext.enabled }}
+      securityContext: {{- omit .Values.pdfApi.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if .Values.pdfApi.terminationGracePeriodSeconds }}
+      terminationGracePeriodSeconds: {{ .Values.pdfApi.terminationGracePeriodSeconds }}
+      {{- end }}
+      initContainers:
+        {{- if and .Values.volumePermissions.enabled .Values.persistence.enabled }}
+        - name: volume-permissions
+          image: {{ include "pdfApi.volumePermissions.image" . }}
+          imagePullPolicy: {{ .Values.volumePermissions.image.pullPolicy | quote }}
+          command:
+            - /bin/bash
+            - -ec
+          {{- if .Values.volumePermissions.containerSecurityContext.enabled }}
+          securityContext: {{- include "common.compatibility.renderSecurityContext" (dict "secContext" .Values.volumePermissions.containerSecurityContext "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.volumePermissions.resources }}
+          resources: {{- toYaml .Values.volumePermissions.resources | nindent 12 }}
+          {{- else if ne .Values.volumePermissions.resourcesPreset "none" }}
+          resources: {{- include "common.resources.preset" (dict "type" .Values.volumePermissions.resourcesPreset) | nindent 12 }}
+          {{- end }}
+          volumeMounts: []
+        {{- end }}
+        {{- if .Values.pdfApi.initContainers }}
+          {{- include "common.tplvalues.render" (dict "value" .Values.pdfApi.initContainers "context" $) | nindent 8 }}
+        {{- end }}
+      containers:
+        - name: pdf-api
+          image: {{ template "vyhub.pdfApi.image" . }}
+          imagePullPolicy: {{ .Values.pdfApi.image.pullPolicy }}
+          {{- if .Values.pdfApi.containerSecurityContext.enabled }}
+          securityContext: {{- include "common.compatibility.renderSecurityContext" (dict "secContext" .Values.pdfApi.containerSecurityContext "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.diagnosticMode.enabled }}
+          command: {{- include "common.tplvalues.render" (dict "value" .Values.diagnosticMode.command "context" $) | nindent 12 }}
+          {{- else if .Values.pdfApi.command }}
+          command: {{- include "common.tplvalues.render" (dict "value" .Values.pdfApi.command "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.diagnosticMode.enabled }}
+          args: {{- include "common.tplvalues.render" (dict "value" .Values.diagnosticMode.args "context" $) | nindent 12 }}
+          {{- else if .Values.pdfApi.args }}
+          args: {{- include "common.tplvalues.render" (dict "value" .Values.pdfApi.args "context" $) | nindent 12 }}
+          {{- end }}
+          env:
+            {{- if .Values.pdfApi.extraEnvVars }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.pdfApi.extraEnvVars "context" $) | nindent 12 }}
+            {{- end }}
+          envFrom:
+            {{- if .Values.pdfApi.extraEnvVarsCM }}
+            - configMapRef:
+                name: {{ include "common.tplvalues.render" (dict "value" .Values.pdfApi.extraEnvVarsCM "context" $) }}
+            {{- end }}
+            {{- if .Values.pdfApi.extraEnvVarsSecret }}
+            - secretRef:
+                name: {{ include "common.tplvalues.render" (dict "value" .Values.pdfApi.extraEnvVarsSecret "context" $) }}
+            {{- end }}
+          {{- if .Values.pdfApi.resources }}
+          resources: {{- toYaml .Values.pdfApi.resources | nindent 12 }}
+          {{- else if ne .Values.pdfApi.resourcesPreset "none" }}
+          resources: {{- include "common.resources.preset" (dict "type" .Values.pdfApi.resourcesPreset) | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.pdfApi.containerPorts.http }}
+            {{- if .Values.pdfApi.extraContainerPorts }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.pdfApi.extraContainerPorts "context" $) | nindent 12 }}
+            {{- end }}
+          {{- if not .Values.diagnosticMode.enabled }}
+          {{- if .Values.pdfApi.customLivenessProbe }}
+          livenessProbe: {{- include "common.tplvalues.render" (dict "value" .Values.pdfApi.customLivenessProbe "context" $) | nindent 12 }}
+          {{- else if .Values.pdfApi.livenessProbe.enabled }}
+          livenessProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.pdfApi.livenessProbe "enabled") "context" $) | nindent 12 }}
+            httpGet:
+              path: /
+              port: {{ .Values.pdfApi.containerPorts.http }}
+              scheme: HTTP
+          {{- end }}
+          {{- if .Values.pdfApi.customReadinessProbe }}
+          readinessProbe: {{- include "common.tplvalues.render" (dict "value" .Values.pdfApi.customReadinessProbe "context" $) | nindent 12 }}
+          {{- else if .Values.pdfApi.readinessProbe.enabled }}
+          readinessProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.pdfApi.readinessProbe "enabled") "context" $) | nindent 12 }}
+            httpGet:
+              path: /
+              port: {{ .Values.pdfApi.containerPorts.http }}
+              scheme: HTTP
+          {{- end }}
+          {{- if .Values.pdfApi.customStartupProbe }}
+          startupProbe: {{- include "common.tplvalues.render" (dict "value" .Values.pdfApi.customStartupProbe "context" $) | nindent 12 }}
+          {{- else if .Values.pdfApi.startupProbe.enabled }}
+          startupProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.pdfApi.startupProbe "enabled") "context" $) | nindent 12 }}
+            httpGet:
+              path: /
+              port: {{ .Values.pdfApi.containerPorts.http }}
+              scheme: HTTP
+          {{- end }}
+          {{- end }}
+          {{- if .Values.pdfApi.lifecycleHooks }}
+          lifecycle: {{- include "common.tplvalues.render" (dict "value" .Values.pdfApi.lifecycleHooks "context" $) | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: empty-dir
+              mountPath: /tmp
+              subPath: tmp-dir
+          {{- if .Values.pdfApi.extraVolumeMounts }}
+          {{- include "common.tplvalues.render" (dict "value" .Values.pdfApi.extraVolumeMounts "context" $) | nindent 12 }}
+          {{- end }}
+        {{- if .Values.pdfApi.sidecars }}
+        {{- include "common.tplvalues.render" ( dict "value" .Values.pdfApi.sidecars "context" $) | nindent 8 }}
+        {{- end }}
+      volumes:
+        - name: empty-dir
+          emptyDir: {}
+        {{- if .Values.pdfApi.extraVolumes }}
+        {{- include "common.tplvalues.render" (dict "value" .Values.pdfApi.extraVolumes "context" $) | nindent 8 }}
+        {{- end }}
