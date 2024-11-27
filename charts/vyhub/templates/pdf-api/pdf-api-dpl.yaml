@@ -131,7 +131,7 @@ spec:
           {{- else if .Values.pdfApi.livenessProbe.enabled }}
           livenessProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.pdfApi.livenessProbe "enabled") "context" $) | nindent 12 }}
             httpGet:
-              path: /
+              path: /healthz
               port: {{ .Values.pdfApi.containerPorts.http }}
               scheme: HTTP
           {{- end }}
@@ -140,7 +140,7 @@ spec:
           {{- else if .Values.pdfApi.readinessProbe.enabled }}
           readinessProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.pdfApi.readinessProbe "enabled") "context" $) | nindent 12 }}
             httpGet:
-              path: /
+              path: /healthz
               port: {{ .Values.pdfApi.containerPorts.http }}
               scheme: HTTP
           {{- end }}
@@ -149,7 +149,7 @@ spec:
           {{- else if .Values.pdfApi.startupProbe.enabled }}
           startupProbe: {{- include "common.tplvalues.render" (dict "value" (omit .Values.pdfApi.startupProbe "enabled") "context" $) | nindent 12 }}
             httpGet:
-              path: /
+              path: /healthz
               port: {{ .Values.pdfApi.containerPorts.http }}
               scheme: HTTP
           {{- end }}
