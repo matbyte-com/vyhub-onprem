@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Matbyte Helm Charts Repository</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      line-height: 1.6;
+    }
+    header {
+      background: #007acc;
+      color: white;
+      padding: 1rem 0;
+      text-align: center;
+    }
+    main {
+      padding: 1rem 2rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+    }
+    table, th, td {
+      border: 1px solid #ddd;
+    }
+    th, td {
+      padding: 0.5rem;
+      text-align: left;
+    }
+    th {
+      background-color: #f4f4f4;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Helm Charts Repository</h1>
+</header>
+
+<main>
+  <section>
+    <h2>How to Use This Repository</h2>
+    <p>To add this Helm repository to your local Helm client, run the following command:</p>
+    <pre><code>helm repo add my-repo-name https://charts.matbyte.com/</code></pre>
+    <p>After adding the repository, update it with:</p>
+    <pre><code>helm repo update</code></pre>
+  </section>
+
+  <section>
+    <h2>Available Charts</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Chart Name</th>
+          <th>Version</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody id="charts-list">
+        <!-- Chart data will be inserted here dynamically -->
+      </tbody>
+    </table>
+  </section>
+</main>
+
+<script>
+  // Fetch and parse the index.yaml file
+  async function loadCharts() {
+    try {
+      const response = await fetch('index.yaml');
+      const yamlText = await response.text();
+
+      // Parse YAML to JSON
+      const data = jsyaml.load(yamlText);
+      const chartsList = document.getElementById('charts-list');
+
+      // Populate the table with chart data
+      for (const [chartName, versions] of Object.entries(data.entries)) {
+        versions.forEach(chart => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${chartName}</td>
+            <td>${chart.version}</td>
+            <td>${chart.description || 'No description available'}</td>
+          `;
+          chartsList.appendChild(row);
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load index.yaml:', error);
+    }
+  }
+
+  // Load the charts on page load
+  document.addEventListener('DOMContentLoaded', loadCharts);
+</script>
+
+<!-- Include js-yaml for YAML parsing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+
+</body>
+</html>
