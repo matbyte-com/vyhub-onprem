@@ -1,0 +1,16 @@
+apiVersion: v1
+entries:
+  vyhub:
+  - apiVersion: v2
+    created: "2024-12-16T12:19:45.325685933Z"
+    dependencies:
+    - name: common
+      repository: oci://registry-1.docker.io/bitnamicharts
+      version: ^2.23.0
+    digest: ce08b4a61d5320173ab8ebb056f4afc83b28245bf18a4a5289000904c27283e7
+    name: vyhub
+    type: application
+    urls:
+    - https://github.com/matbyte-com/vyhub-onprem/releases/download/vyhub-0.1.0/vyhub-0.1.0.tgz
+    version: 0.1.0
+generated: "2024-12-16T12:19:45.325695251Z"
