@@ -172,7 +172,7 @@ app:
   ## @param app.resourcesPreset Set VyHub app container resources according to one common preset (allowed values: none, nano, small, medium, large, xlarge, 2xlarge). This is ignored if app.resources is set (app.resources is recommended for production).
   ## More information: https://github.com/bitnami/charts/blob/main/bitnami/common/templates/_resources.tpl#L15
   ##
-  resourcesPreset: "small"
+  resourcesPreset: "medium"
   ## @param app.resources Set VyHub app container requests and limits for different resources like CPU or memory (essential for production workloads)
   ## Example:
   ## resources:
@@ -197,7 +197,7 @@ app:
     fsGroupChangePolicy: Always
     sysctls: []
     supplementalGroups: []
-    fsGroup: 1001
+    fsGroup: 1000
   ## Configure Container Security Context
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
   ## @param app.containerSecurityContext.enabled Enabled VyHub app container' Security Context
@@ -214,8 +214,8 @@ app:
   containerSecurityContext:
     enabled: true
     seLinuxOptions: {}
-    runAsUser: 1001
-    runAsGroup: 1001
+    runAsUser: 1000
+    runAsGroup: 1000
     runAsNonRoot: true
     readOnlyRootFilesystem: true
     privileged: false
@@ -708,8 +708,8 @@ frontend:
   containerSecurityContext:
     enabled: true
     seLinuxOptions: {}
-    runAsUser: 1001
-    runAsGroup: 1001
+    runAsUser: 1000
+    runAsGroup: 1000
     runAsNonRoot: true
     readOnlyRootFilesystem: true
     privileged: false
@@ -889,7 +889,7 @@ geoipApi:
     fsGroupChangePolicy: Always
     sysctls: []
     supplementalGroups: []
-    fsGroup: 1001
+    fsGroup: 1000
   ## Configure Container Security Context
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
   ## @param geoipApi.containerSecurityContext.enabled Enabled VyHub geoipApi container' Security Context
@@ -906,8 +906,8 @@ geoipApi:
   containerSecurityContext:
     enabled: true
     seLinuxOptions: {}
-    runAsUser: 1001
-    runAsGroup: 1001
+    runAsUser: 1000
+    runAsGroup: 1000
     runAsNonRoot: true
     readOnlyRootFilesystem: true
     privileged: false
@@ -1313,7 +1313,7 @@ pdfApi:
     fsGroupChangePolicy: Always
     sysctls: []
     supplementalGroups: []
-    fsGroup: 1001
+    fsGroup: 1000
   ## Configure Container Security Context
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
   ## @param pdfApi.containerSecurityContext.enabled Enabled VyHub pdfApi container' Security Context
@@ -1330,8 +1330,8 @@ pdfApi:
   containerSecurityContext:
     enabled: true
     seLinuxOptions: {}
-    runAsUser: 1001
-    runAsGroup: 1001
+    runAsUser: 1000
+    runAsGroup: 1000
     runAsNonRoot: true
     readOnlyRootFilesystem: true
     privileged: false

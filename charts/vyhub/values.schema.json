@@ -297,7 +297,7 @@
                 "resourcesPreset": {
                     "type": "string",
                     "description": "Set VyHub app container resources according to one common preset (allowed values: none, nano, small, medium, large, xlarge, 2xlarge). This is ignored if app.resources is set (app.resources is recommended for production).",
-                    "default": "small"
+                    "default": "medium"
                 },
                 "resources": {
                     "type": "object",
@@ -332,7 +332,7 @@
                         "fsGroup": {
                             "type": "number",
                             "description": "Set fsGroup in VyHub app pods' Security Context",
-                            "default": 1001
+                            "default": 1000
                         }
                     }
                 },
@@ -347,12 +347,12 @@
                         "runAsUser": {
                             "type": "number",
                             "description": "Set runAsUser in VyHub app container' Security Context",
-                            "default": 1001
+                            "default": 1000
                         },
                         "runAsGroup": {
                             "type": "number",
                             "description": "Set runAsGroup in VyHub app container' Security Context",
-                            "default": 1001
+                            "default": 1000
                         },
                         "runAsNonRoot": {
                             "type": "boolean",
@@ -1115,12 +1115,12 @@
                         "runAsUser": {
                             "type": "number",
                             "description": "Set runAsUser in VyHub frontend container' Security Context",
-                            "default": 1001
+                            "default": 1000
                         },
                         "runAsGroup": {
                             "type": "number",
                             "description": "Set runAsGroup in VyHub frontend container' Security Context",
-                            "default": 1001
+                            "default": 1000
                         },
                         "runAsNonRoot": {
                             "type": "boolean",
@@ -1459,7 +1459,7 @@
                         "fsGroup": {
                             "type": "number",
                             "description": "Set fsGroup in VyHub geoipApi pods' Security Context",
-                            "default": 1001
+                            "default": 1000
                         }
                     }
                 },
@@ -1474,12 +1474,12 @@
                         "runAsUser": {
                             "type": "number",
                             "description": "Set runAsUser in VyHub geoipApi container' Security Context",
-                            "default": 1001
+                            "default": 1000
                         },
                         "runAsGroup": {
                             "type": "number",
                             "description": "Set runAsGroup in VyHub geoipApi container' Security Context",
-                            "default": 1001
+                            "default": 1000
                         },
                         "runAsNonRoot": {
                             "type": "boolean",
@@ -2128,7 +2128,7 @@
                         "fsGroup": {
                             "type": "number",
                             "description": "Set fsGroup in VyHub pdfApi pods' Security Context",
-                            "default": 1001
+                            "default": 1000
                         }
                     }
                 },
@@ -2143,12 +2143,12 @@
                         "runAsUser": {
                             "type": "number",
                             "description": "Set runAsUser in VyHub pdfApi container' Security Context",
-                            "default": 1001
+                            "default": 1000
                         },
                         "runAsGroup": {
                             "type": "number",
                             "description": "Set runAsGroup in VyHub pdfApi container' Security Context",
-                            "default": 1001
+                            "default": 1000
                         },
                         "runAsNonRoot": {
                             "type": "boolean",
