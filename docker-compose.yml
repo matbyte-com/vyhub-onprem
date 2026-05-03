@@ -26,7 +26,7 @@ services:
   geoip-api:
     image: observabilitystack/geoip-api:latest
   pdf-api:
-    image: ghcr.io/matbyte-com/htmltopdf-api:1.0.0
+    image: ghcr.io/matbyte-com/htmltopdf-api:1.1.0
     stop_signal: SIGKILL
   loki:
     image: grafana/loki:2.8.0
