@@ -1,4 +1,3 @@
-version: '3'
 services:
   app:
     image: registry.matbyte.com/vyhub/vyhub-onprem:latest
@@ -14,7 +13,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
   db:
-    image: postgres:15
+    image: postgres:17
     # ports:
     #  - 15432:5432
     environment:
@@ -46,6 +45,25 @@ services:
       - "443:443"
     depends_on:
       - app
+  db-backup:
+    image: prodrigestivill/postgres-backup-local:17
+    restart: unless-stopped
+    depends_on:
+      - db
+    volumes:
+      - vyhub-db-backups:/backups
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: vyhub
+      POSTGRES_USER: vyhub
+      POSTGRES_PASSWORD: ${VYHUB_DB_PASSWORD}
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+      POSTGRES_EXTRA_OPTS: "--no-owner --no-acl"
+      HEALTHCHECK_PORT: 8080
 volumes:
   vyhub-db:
   vyhub-loki:
+  vyhub-db-backups:
