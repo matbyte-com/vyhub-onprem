@@ -1,0 +1,138 @@
+#cloud-config
+hostname: ${hostname}
+fqdn: ${hostname}
+preserve_hostname: false
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - openssl
+  - certbot
+  - unattended-upgrades
+  - fail2ban
+  - jq
+
+users:
+  - name: root
+    ssh_authorized_keys:
+${join("\n", [for k in ssh_keys : "      - ${k}"])}
+
+ssh_pwauth: false
+disable_root: false
+
+write_files:
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    permissions: '0644'
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+  - path: /etc/vyhub-onprem.env
+    permissions: '0600'
+    owner: root:root
+    content: |
+${join("\n", [for k, v in vyhub_env : "      ${k}=${jsonencode(v)}"])}
+%{ if registry_url != "" ~}
+
+  - path: /etc/vyhub-registry.env
+    permissions: '0600'
+    owner: root:root
+    content: |
+      ${registry_url}
+      ${registry_user}
+      ${registry_password}
+%{ endif ~}
+
+  - path: /usr/local/sbin/vyhub-bootstrap.sh
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      REPO_URL="${repo_url}"
+      REPO_REF="${repo_ref}"
+      TARGET=/opt/vyhub-onprem
+      USER_ENV=/etc/vyhub-onprem.env
+
+      echo "[vyhub-bootstrap] installing Docker..."
+      if ! command -v docker >/dev/null 2>&1; then
+        curl -fsSL https://get.docker.com | sh
+      fi
+      systemctl enable --now docker
+
+      echo "[vyhub-bootstrap] cloning $REPO_URL@$REPO_REF -> $TARGET"
+      if [ ! -d "$TARGET/.git" ]; then
+        git clone --branch "$REPO_REF" "$REPO_URL" "$TARGET"
+      fi
+
+      cd "$TARGET"
+
+      if [ ! -f .env ] && [ ! -f docker-compose.override.yml ]; then
+        echo "[vyhub-bootstrap] running first-setup.sh"
+        bash ./first-setup.sh
+      fi
+
+      echo "[vyhub-bootstrap] merging user-supplied VyHub env vars"
+      # Insert the user-supplied vars at the designated marker line and drop
+      # any later duplicate key definitions left by the template.
+      awk -v src="$USER_ENV" '
+        BEGIN {
+          n = 0
+          while ((getline line < src) > 0) {
+            if (line ~ /^[[:space:]]*#/ || line ~ /^[[:space:]]*$/) continue
+            eq = index(line, "=")
+            if (!eq) continue
+            userkeys[substr(line, 1, eq-1)] = 1
+            userlines[n++] = line
+          }
+        }
+        /# INSERT CONFIG FROM THE SETUP DIALOG ABOVE/ {
+          print
+          for (i = 0; i < n; i++) print userlines[i]
+          next
+        }
+        {
+          eq = index($0, "=")
+          if (eq > 0 && substr($0, 1, eq-1) in userkeys) next
+          print
+        }
+      ' .env > .env.tmp
+      mv .env.tmp .env
+      chmod 644 .env
+
+      mkdir -p nginx/certs
+      if [ ! -f nginx/certs/vyhub.crt ]; then
+        echo "[vyhub-bootstrap] generating placeholder self-signed cert"
+        openssl req -x509 -nodes -newkey rsa:2048 -days 30 \
+          -subj "/CN=$(hostname -f)" \
+          -keyout nginx/certs/vyhub.key \
+          -out    nginx/certs/vyhub.crt
+        chmod 600 nginx/certs/vyhub.key
+      fi
+
+      echo "[vyhub-bootstrap] starting docker compose stack"
+      if [ -f /etc/vyhub-registry.env ]; then
+        _REG_URL="$(sed -n '1p' /etc/vyhub-registry.env)"
+        _REG_USER="$(sed -n '2p' /etc/vyhub-registry.env)"
+        echo "[vyhub-bootstrap] logging in to container registry $_REG_URL"
+        sed -n '3p' /etc/vyhub-registry.env \
+          | docker login "$_REG_URL" -u "$_REG_USER" --password-stdin
+        unset _REG_URL _REG_USER
+        rm -f /etc/vyhub-registry.env
+      fi
+      docker compose pull
+      docker compose up -d
+
+      echo "[vyhub-bootstrap] done"
+      date -u +%FT%TZ > /var/lib/vyhub-onprem-ready
+
+runcmd:
+  - [ systemctl, enable, --now, fail2ban ]
+  - [ /usr/local/sbin/vyhub-bootstrap.sh ]
+
+final_message: "vyhub-onprem cloud-init finished after $UPTIME seconds"
