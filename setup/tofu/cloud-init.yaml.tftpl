@@ -217,12 +217,17 @@ write_files:
         fi
       fi
 
-      # --- 4. Registry login ---------------------------------------------------
+      # --- 4. Registry login (host + inside Coolify container) ------------------
       if [ -n "$REGISTRY_URL" ] && [ -n "$REGISTRY_USER" ]; then
-        log "docker login $REGISTRY_URL"
+        log "docker login $REGISTRY_URL (host)"
         printf '%s' "$REGISTRY_PASSWORD" \
           | docker login "$REGISTRY_URL" -u "$REGISTRY_USER" --password-stdin \
-          >>"$LOG" 2>&1 || log "WARN: docker login failed"
+          >>"$LOG" 2>&1 || log "WARN: docker login on host failed"
+        log "docker login $REGISTRY_URL (coolify container)"
+        printf '%s' "$REGISTRY_PASSWORD" \
+          | docker exec -i coolify \
+            docker login "$REGISTRY_URL" -u "$REGISTRY_USER" --password-stdin \
+          >>"$LOG" 2>&1 || log "WARN: docker login inside coolify container failed"
       fi
 
       # --- 5. Deploy VyHub via Coolify API -------------------------------------
@@ -348,21 +353,21 @@ write_files:
       echo "[deploy] app_uuid=$APP_UUID"
 
       # --- environment variables -----------------------------------------------
-      echo "[deploy] setting env vars"
-      jq -c 'to_entries[]' "$VYHUB_ENV_FILE" | while IFS= read -r entry; do
-        key=$(printf '%s' "$entry" | jq -r '.key')
-        val=$(printf '%s' "$entry" | jq -r '.value')
-        [ -z "$key" ] && continue
-        api -X POST "http://localhost:8000/api/v1/applications/$APP_UUID/envs" \
-          -d "$(jq -n --arg k "$key" --arg v "$val" \
-              '{key:$k,value:$v,is_preview:false,is_build_time:false}')" \
-          >/dev/null || echo "[deploy] WARN: failed to set $key"
-      done
-
-      api -X POST "http://localhost:8000/api/v1/applications/$APP_UUID/envs" \
-        -d "$(jq -n --arg v "https://$VYHUB_FQDN" \
-            '{key:"SERVICE_FQDN_APP",value:$v,is_preview:false,is_build_time:false}')" \
-        >/dev/null || true
+      # Coolify services use an .env file, not the /applications/.../envs API.
+      SERVICE_ENV_FILE="/data/coolify/services/$APP_UUID/.env"
+      echo "[deploy] writing env vars to $SERVICE_ENV_FILE"
+      if [ -f "$SERVICE_ENV_FILE" ]; then
+        # remove any keys we're about to write so there are no duplicates
+        KEYS=$(jq -r 'keys[]' "$VYHUB_ENV_FILE")
+        for key in $KEYS SERVICE_FQDN_APP; do
+          sed -i "/^${key}=/d" "$SERVICE_ENV_FILE"
+        done
+        jq -r 'to_entries[] | "\(.key)=\(.value)"' "$VYHUB_ENV_FILE" >> "$SERVICE_ENV_FILE"
+        printf 'SERVICE_FQDN_APP=https://%s\n' "$VYHUB_FQDN" >> "$SERVICE_ENV_FILE"
+        echo "[deploy] env vars written"
+      else
+        echo "[deploy] WARN: $SERVICE_ENV_FILE not found; env vars not applied"
+      fi
 
       # --- start ---------------------------------------------------------------
       echo "[deploy] starting deployment"
