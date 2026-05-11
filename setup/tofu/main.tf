@@ -1,15 +1,18 @@
 locals {
   ssh_key_fingerprints = [for k in var.ssh_public_keys : sha256(k)]
 
+  # Values land inside single-quoted bash literals; escape embedded ' as '\''.
   cloud_init = templatefile("${path.module}/cloud-init.yaml.tftpl", {
-    hostname           = var.server_name
-    repo_url           = var.repo_url
-    repo_ref           = var.repo_ref
-    ssh_keys           = var.ssh_public_keys
-    vyhub_env          = var.vyhub_env
-    registry_url       = var.registry_url
-    registry_user      = var.registry_user
-    registry_password  = var.registry_password
+    hostname               = var.server_name
+    ssh_keys               = var.ssh_public_keys
+    coolify_admin_email    = replace(var.coolify_admin_email, "'", "'\\''")
+    coolify_admin_password = replace(var.coolify_admin_password, "'", "'\\''")
+    vyhub_fqdn             = replace(var.vyhub_fqdn, "'", "'\\''")
+    vyhub_env              = var.vyhub_env
+    registry_url           = replace(var.registry_url, "'", "'\\''")
+    registry_user          = replace(var.registry_user, "'", "'\\''")
+    registry_password      = replace(var.registry_password, "'", "'\\''")
+    compose_url            = replace(var.compose_url, "'", "'\\''")
   })
 }
 

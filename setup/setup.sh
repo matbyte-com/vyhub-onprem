@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 #
-# vyhub-onprem interactive setup.
+# vyhub-onprem interactive setup (Coolify edition).
 #
-# Provisions a Hetzner Cloud VM with Docker + the vyhub-onprem stack via
-# OpenTofu, drives the post-deploy DNS / Let's Encrypt steps, and offers
-# a few convenience subcommands for day-2 operations.
+# Provisions a Hetzner Cloud VM, installs Coolify, and uses Coolify's API to
+# deploy the vyhub-onprem Docker Compose stack end-to-end. Traefik (managed
+# by Coolify) terminates HTTPS via Let's Encrypt for VyHub. The Coolify admin
+# UI is not exposed publicly; use `./setup.sh tunnel` to reach it over SSH.
 #
 # Usage:
 #   ./setup.sh              # full interactive flow (default)
 #   ./setup.sh apply        # re-run `tofu apply` with the saved inputs
 #   ./setup.sh outputs      # print server IPs and management hints
 #   ./setup.sh ssh          # ssh into the provisioned server as root
-#   ./setup.sh wait         # block until cloud-init finishes
-#   ./setup.sh certbot      # request/replace Let's Encrypt cert
+#   ./setup.sh tunnel [PORT]# SSH port-forward Coolify to localhost:PORT (default 8000)
+#   ./setup.sh wait         # block until the bootstrap finishes
+#   ./setup.sh credentials  # reprint Coolify admin credentials
+#   ./setup.sh logs         # tail the bootstrap log on the server
 #   ./setup.sh redeploy     # destroy and reprovision the server (requires typed confirmation)
 #   ./setup.sh destroy      # tear down the Hetzner resources
 #
@@ -100,26 +103,94 @@ prompt_yes_no() {
 }
 
 hcloud_api() {
-  # $1 = path, e.g. /locations
   curl -fsSL -H "Authorization: Bearer $HCLOUD_TOKEN" \
     "https://api.hetzner.cloud/v1$1"
+}
+
+# Load HCLOUD_TOKEN from the saved tfvars (for destroy/redeploy subcommands
+# where the user hasn't gone through the interactive token prompt).
+load_hcloud_token() {
+  HCLOUD_TOKEN="$(jq -r '.hcloud_token // empty' "$TFVARS_FILE")"
+  [ -n "$HCLOUD_TOKEN" ] || die "hcloud_token not found in $TFVARS_FILE"
+}
+
+# Delete every Hetzner resource carrying our managed-by label, using the
+# Hetzner API directly. This is the reliable path: Tofu state may be stale or
+# missing, but the label is always on the real resources.
+hcloud_purge() {
+  local base="https://api.hetzner.cloud/v1"
+  local auth_header="Authorization: Bearer $HCLOUD_TOKEN"
+  # Filter by label in jq rather than via label_selector URL param — the
+  # label_selector query parameter is not supported on all resource types
+  # (notably ssh_keys), so fetching all and filtering locally is more reliable.
+  local jq_filter='[.[] | select(.labels["managed-by"] == "vyhub-onprem-setup")] | .[].id'
+
+  # --- servers first; firewalls cannot be deleted while still attached --------
+  local server_ids
+  server_ids=$(hcloud_api "/servers?per_page=100" | jq -r ".servers | $jq_filter")
+  for id in $server_ids; do
+    info "  deleting server $id"
+    curl -X DELETE -fsS -H "$auth_header" "$base/servers/$id" >/dev/null || true
+  done
+
+  if [ -n "$server_ids" ]; then
+    info "waiting for server deletion to complete..."
+    local i count
+    for i in $(seq 1 30); do
+      count=$(hcloud_api "/servers?per_page=100" \
+        | jq "[.servers[] | select(.labels[\"managed-by\"] == \"vyhub-onprem-setup\")] | length" \
+        2>/dev/null || echo 1)
+      [ "$count" = "0" ] && break
+      sleep 10
+    done
+  fi
+
+  # --- firewalls --------------------------------------------------------------
+  for id in $(hcloud_api "/firewalls?per_page=100" | jq -r ".firewalls | $jq_filter"); do
+    info "  deleting firewall $id"
+    curl -X DELETE -fsS -H "$auth_header" "$base/firewalls/$id" >/dev/null || true
+  done
+
+  # --- SSH keys ---------------------------------------------------------------
+  for id in $(hcloud_api "/ssh_keys?per_page=100" | jq -r ".ssh_keys | $jq_filter"); do
+    info "  deleting SSH key $id"
+    curl -X DELETE -fsS -H "$auth_header" "$base/ssh_keys/$id" >/dev/null || true
+  done
+
+  ok "Hetzner resources purged"
+}
+
+generate_password() {
+  # 32 alphanumeric chars — avoids shell/yaml/sed escaping concerns.
+  # Use openssl + bash substring to avoid SIGPIPE on a |head pipeline
+  # (which set -o pipefail would surface and abort the script).
+  local pw
+  pw=$(openssl rand -base64 48 | tr -d '+/=\n')
+  printf '%s' "${pw:0:32}"
+}
+
+extract_host() {
+  printf '%s' "$1" | sed -E 's#^https?://##; s#/.*$##'
 }
 
 # ---------- interactive sections ----------------------------------------------
 
 intro() {
-  section "vyhub-onprem setup"
+  section "vyhub-onprem setup (Coolify)"
   cat <<'EOF'
-This script provisions a Hetzner Cloud VM (Debian 13 + Docker), clones the
-vyhub-onprem repo onto it, and brings the stack up. It will guide you
-through the few manual steps along the way.
+This script provisions a Hetzner Cloud VM, installs Coolify on it, and uses
+Coolify's API to deploy the vyhub-onprem Docker Compose stack. Coolify's
+built-in Traefik handles HTTPS via Let's Encrypt for VyHub. The Coolify
+admin UI is not publicly exposed; access it with: $0 tunnel
 
 You will need:
   1. A Hetzner Cloud account                  https://accounts.hetzner.com/signUp
   2. A Hetzner Cloud project                  https://console.hetzner.cloud/projects
   3. A read+write API token in that project   Project -> Security -> API Tokens
-  4. The VyHub instance env vars              from https://www.vyhub.net
-  5. An SSH public key on this machine        (e.g. ~/.ssh/id_ed25519.pub)
+  4. One domain/hostname you control          (e.g. vyhub.example.com)
+  5. The VyHub instance env vars              from https://www.vyhub.net
+  6. The vyhub container registry login       from https://www.vyhub.net
+  7. An SSH public key on this machine        (e.g. ~/.ssh/id_ed25519.pub)
 
 EOF
   if ! prompt_yes_no "Ready to continue?" y; then
@@ -161,6 +232,7 @@ ask_server_type() {
     | column -t -s $'\t' | head -n 30
   say "  ..."
   say "  CAX11 (2c / 4GB / 40GB ARM) is the recommended starter size."
+  say "  Note: Coolify itself uses ~500 MB RAM on top of the vyhub-onprem stack."
   SERVER_TYPE="$(prompt "Server type" "cax11")"
 }
 
@@ -199,6 +271,17 @@ ask_ssh_keys() {
   fi
 }
 
+ask_vyhub_settings() {
+  section "VyHub settings"
+  VYHUB_FQDN="$(prompt "FQDN for VyHub (HTTPS) e.g. vyhub.example.com")"
+  [ -n "$VYHUB_FQDN" ] || die "VyHub FQDN is required"
+  say "  Coolify's admin UI is not publicly exposed. Use: $0 tunnel"
+  COOLIFY_ADMIN_EMAIL="$(prompt "Admin email (used for Coolify login + Let's Encrypt notices)")"
+  [ -n "$COOLIFY_ADMIN_EMAIL" ] || die "admin email is required"
+  COOLIFY_ADMIN_PASSWORD="$(generate_password)"
+  ok "generated 32-char admin password (will be shown at the end)"
+}
+
 ask_registry_login() {
   section "Container registry"
   cat <<'EOF'
@@ -210,8 +293,6 @@ EOF
   local cmd
   read -r -p "> " cmd
 
-  # Parse: docker login <url> [-u <user>] [-p <pass>]
-  # awk strips surrounding single/double quotes from each token.
   local parsed
   parsed="$(printf '%s\n' "$cmd" | awk '{
     url = ""; u = ""; p = ""
@@ -257,7 +338,6 @@ EOF
   printf '%s\n' "$block" > "$ENV_BLOCK_FILE"
   chmod 600 "$ENV_BLOCK_FILE"
 
-  # Parse KEY="value" / KEY=value lines into a JSON object via jq.
   ENV_JSON="$(printf '%s\n' "$block" | awk '
     /^[[:space:]]*#/ {next}
     /^[[:space:]]*$/ {next}
@@ -328,19 +408,25 @@ write_tfvars() {
     --argjson ssh_keys "$ssh_keys_json" \
     --argjson vyhub_env "$ENV_JSON" \
     --argjson backups "$ENABLE_BACKUPS" \
+    --arg coolify_admin_email "$COOLIFY_ADMIN_EMAIL" \
+    --arg coolify_admin_password "$COOLIFY_ADMIN_PASSWORD" \
+    --arg vyhub_fqdn "$VYHUB_FQDN" \
     --arg reg_url "$REGISTRY_URL" \
     --arg reg_user "$REGISTRY_USER" \
     --arg reg_pass "$REGISTRY_PASS" \
     '{
-      hcloud_token:      $token,
-      location:          $location,
-      server_type:       $server_type,
-      ssh_public_keys:   $ssh_keys,
-      vyhub_env:         $vyhub_env,
-      enable_backups:    $backups,
-      registry_url:      $reg_url,
-      registry_user:     $reg_user,
-      registry_password: $reg_pass
+      hcloud_token:           $token,
+      location:               $location,
+      server_type:            $server_type,
+      ssh_public_keys:        $ssh_keys,
+      vyhub_env:              $vyhub_env,
+      enable_backups:         $backups,
+      coolify_admin_email:    $coolify_admin_email,
+      coolify_admin_password: $coolify_admin_password,
+      vyhub_fqdn:             $vyhub_fqdn,
+      registry_url:           $reg_url,
+      registry_user:          $reg_user,
+      registry_password:      $reg_pass
     }' > "$TFVARS_FILE"
   chmod 600 "$TFVARS_FILE"
   ok "wrote $TFVARS_FILE"
@@ -364,15 +450,33 @@ ssh_to_server() {
   ssh "${ssh_args[@]}" "root@$ipv4" "$@"
 }
 
-wait_for_cloud_init() {
-  section "Waiting for cloud-init"
+print_dns_instructions() {
+  section "DNS"
+  local ipv4 ipv6 vyhub_host
+  ipv4="$(tofu_output ipv4_address)"
+  ipv6="$(tofu_output ipv6_address)"
+  vyhub_host="$(jq -r '.vyhub_fqdn' "$TFVARS_FILE")"
+
+  cat <<EOF
+Create the following DNS records (TTL 60s is convenient for setup):
+
+  A     $vyhub_host.   ->  $ipv4
+  AAAA  $vyhub_host.   ->  $ipv6
+
+Let's Encrypt will only succeed once DNS resolves to this server.
+EOF
+}
+
+wait_for_coolify() {
+  section "Waiting for Coolify bootstrap"
   local ipv4
   ipv4="$(tofu_output ipv4_address)"
-  info "polling root@$ipv4 for /var/lib/vyhub-onprem-ready (this typically takes 3-6 minutes)"
-  local attempt=0 max_attempts=120
+  info "polling root@$ipv4 for /var/lib/vyhub-coolify-ready (typically 8-15 minutes)"
+  info "tail the live log with: $0 logs"
+  local attempt=0 max_attempts=180
   while [ $attempt -lt $max_attempts ]; do
-    if ssh_to_server "test -f /var/lib/vyhub-onprem-ready" >/dev/null 2>&1; then
-      ok "cloud-init finished"
+    if ssh_to_server "test -f /var/lib/vyhub-coolify-ready" >/dev/null 2>&1; then
+      ok "Coolify bootstrap finished"
       return 0
     fi
     attempt=$((attempt + 1))
@@ -380,90 +484,28 @@ wait_for_cloud_init() {
     printf '.'
   done
   printf '\n'
-  die "timed out waiting for cloud-init; ssh in and check /var/log/cloud-init-output.log"
+  die "timed out waiting for bootstrap; ssh in and check /var/log/vyhub-coolify-bootstrap.log"
 }
 
-print_dns_instructions() {
-  section "DNS"
-  local ipv4 ipv6 frontend host
+print_credentials() {
+  section "Credentials"
+  local vyhub_host pw email ipv4
+  vyhub_host="$(jq -r '.vyhub_fqdn' "$TFVARS_FILE")"
+  pw="$(jq -r '.coolify_admin_password' "$TFVARS_FILE")"
+  email="$(jq -r '.coolify_admin_email' "$TFVARS_FILE")"
   ipv4="$(tofu_output ipv4_address)"
-  ipv6="$(tofu_output ipv6_address)"
-  frontend="$(jq -r '.vyhub_env.VYHUB_FRONTEND_URL' "$TFVARS_FILE")"
-  host="$(printf '%s' "$frontend" | sed -E 's#^https?://##; s#/.*$##')"
 
   cat <<EOF
-Create the following DNS records for ${C_BOLD}$host${C_RST}:
+Coolify UI:   ${C_BOLD}http://localhost:8000${C_RST}  (SSH tunnel only — not public)
+  Open:       ${C_DIM}$0 tunnel${C_RST}
+  Email:      ${C_BOLD}$email${C_RST}
+  Password:   ${C_BOLD}$pw${C_RST}
 
-  A     $host.   ->  $ipv4
-  AAAA  $host.   ->  $ipv6
+VyHub:        ${C_BOLD}https://$vyhub_host${C_RST}
+              (cert issued as soon as DNS for $vyhub_host resolves)
 
-Once the records propagate, $frontend will resolve to your server.
+Password also stored in $TFVARS_FILE (chmod 600). Rotate it in Coolify.
 EOF
-}
-
-# ---------- letsencrypt --------------------------------------------------------
-
-run_certbot() {
-  section "Let's Encrypt certificate"
-  local frontend host email ipv4 resolved
-  frontend="$(jq -r '.vyhub_env.VYHUB_FRONTEND_URL' "$TFVARS_FILE")"
-  host="$(printf '%s' "$frontend" | sed -E 's#^https?://##; s#/.*$##')"
-  ipv4="$(tofu_output ipv4_address)"
-
-  say "Frontend URL: $frontend"
-  say "Domain     : $host"
-  say "Server IPv4: $ipv4"
-
-  if command -v dig >/dev/null 2>&1; then
-    resolved="$(dig +short A "$host" | tail -n1)"
-    if [ -n "$resolved" ] && [ "$resolved" != "$ipv4" ]; then
-      warn "DNS for $host currently resolves to $resolved (expected $ipv4)"
-      prompt_yes_no "Continue anyway?" n || return 0
-    fi
-  fi
-
-  email="$(prompt "E-Mail address for Let's Encrypt expiry notices")"
-  [ -n "$email" ] || die "email is required"
-
-  info "running certbot on the server"
-  ssh_to_server "DOMAIN='$host' EMAIL='$email' bash -s" <<'REMOTE'
-set -euo pipefail
-cd /opt/vyhub-onprem
-
-# Free port 80 so certbot --standalone can listen.
-docker compose stop nginx >/dev/null 2>&1 || true
-
-certbot certonly --standalone --non-interactive --agree-tos \
-  --no-eff-email -m "$EMAIL" -d "$DOMAIN"
-
-mkdir -p nginx/certs
-install -m 644 "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" nginx/certs/vyhub.crt
-install -m 600 "/etc/letsencrypt/live/$DOMAIN/privkey.pem"   nginx/certs/vyhub.key
-
-# Reload-on-renewal hook: copy the renewed cert into nginx/certs and reload.
-mkdir -p /etc/letsencrypt/renewal-hooks/deploy
-cat > /etc/letsencrypt/renewal-hooks/deploy/vyhub-onprem.sh <<HOOK
-#!/usr/bin/env bash
-set -euo pipefail
-DOMAIN="$DOMAIN"
-TARGET=/opt/vyhub-onprem
-case " \$RENEWED_DOMAINS " in
-  *" \$DOMAIN "*)
-    install -m 644 "/etc/letsencrypt/live/\$DOMAIN/fullchain.pem" "\$TARGET/nginx/certs/vyhub.crt"
-    install -m 600 "/etc/letsencrypt/live/\$DOMAIN/privkey.pem"   "\$TARGET/nginx/certs/vyhub.key"
-    cd "\$TARGET" && docker compose restart nginx
-    ;;
-esac
-HOOK
-chmod +x /etc/letsencrypt/renewal-hooks/deploy/vyhub-onprem.sh
-
-systemctl enable --now certbot.timer >/dev/null 2>&1 || true
-
-docker compose up -d nginx
-echo "[certbot] cert installed for $DOMAIN"
-REMOTE
-
-  ok "Let's Encrypt certificate installed; auto-renewal handled by certbot.timer"
 }
 
 # ---------- subcommands --------------------------------------------------------
@@ -478,18 +520,19 @@ cmd_apply() {
 cmd_outputs() {
   section "Server"
   ( cd "$TOFU_DIR" && tofu output )
+  local ipv4
+  ipv4="$(tofu_output ipv4_address)"
   cat <<EOF
 
 Management cheatsheet:
-  ssh root@$(tofu_output ipv4_address)
+  ssh root@$ipv4
   $0 ssh           # ssh as root
-  $0 wait          # wait for cloud-init
-  $0 certbot       # request/replace Let's Encrypt cert
+  $0 tunnel        # SSH port-forward Coolify to localhost:8000
+  $0 wait          # wait for the bootstrap to finish
+  $0 logs          # tail the bootstrap log
+  $0 credentials   # reprint Coolify admin credentials
   $0 redeploy      # nuke + reprovision (requires typing the server name)
   $0 destroy       # tear down
-
-Application logs (on the server):
-  cd /opt/vyhub-onprem && docker compose logs -f
 EOF
 }
 
@@ -497,23 +540,45 @@ cmd_ssh() {
   ssh_to_server "$@"
 }
 
-cmd_wait() {
-  wait_for_cloud_init
+cmd_tunnel() {
+  local local_port="${1:-8000}"
+  local ipv4
+  ipv4="$(tofu_output ipv4_address)"
+  info "Forwarding localhost:$local_port -> $ipv4:8000 (Coolify)"
+  info "Open http://localhost:$local_port in your browser. Ctrl-C to stop."
+  ssh_to_server -N -L "${local_port}:localhost:8000"
 }
 
-cmd_certbot() {
-  check_prereqs
-  [ -f "$TFVARS_FILE" ] || die "no $TFVARS_FILE; run \`$0\` first"
-  run_certbot
+cmd_wait() {
+  wait_for_coolify
+}
+
+cmd_credentials() {
+  [ -f "$TFVARS_FILE" ] || die "no $TFVARS_FILE; nothing to print"
+  print_credentials
+}
+
+cmd_logs() {
+  ssh_to_server "tail -F /var/log/vyhub-coolify-bootstrap.log"
+}
+
+_do_destroy() {
+  # 1. tofu destroy uses the state file's exact resource IDs — the fast path.
+  ( cd "$TOFU_DIR" && tofu destroy -auto-approve ) || true
+  # 2. hcloud_purge is a safety net for anything that leaked outside state
+  #    (e.g. partial previous run, manually created resources with our label).
+  hcloud_purge
+  rm -f "$TOFU_DIR/terraform.tfstate" "$TOFU_DIR/terraform.tfstate.backup" \
+        "$SCRIPT_DIR/.known_hosts"
 }
 
 cmd_destroy() {
   check_prereqs
   [ -f "$TFVARS_FILE" ] || die "no $TFVARS_FILE; nothing to destroy"
-  warn "This will permanently delete the Hetzner server, firewall and SSH keys created by this setup."
+  warn "This will permanently delete the Hetzner server, firewall and SSH keys."
   prompt_yes_no "Proceed with destroy?" n || die "aborted"
-  ( cd "$TOFU_DIR" && tofu destroy -auto-approve )
-  rm -f "$SCRIPT_DIR/.known_hosts"
+  load_hcloud_token
+  _do_destroy
 }
 
 cmd_redeploy() {
@@ -534,12 +599,21 @@ cmd_redeploy() {
   read -r reply
   [ "$reply" = "$server_name" ] || die "confirmation did not match — aborted"
 
-  ( cd "$TOFU_DIR" && tofu destroy -auto-approve )
-  rm -f "$SCRIPT_DIR/.known_hosts"
-  ( cd "$TOFU_DIR" && tofu apply -auto-approve )
+  # Rotate the admin password so the old one is invalidated on the new server.
+  local new_pw tmp
+  new_pw="$(generate_password)"
+  tmp="$(mktemp)"
+  jq --arg pw "$new_pw" '.coolify_admin_password = $pw' "$TFVARS_FILE" > "$tmp"
+  mv "$tmp" "$TFVARS_FILE"
+  chmod 600 "$TFVARS_FILE"
 
-  if prompt_yes_no "Wait for cloud-init to finish?" y; then
-    wait_for_cloud_init
+  load_hcloud_token
+  _do_destroy
+  ( cd "$TOFU_DIR" && tofu init -upgrade && tofu apply -auto-approve )
+
+  if prompt_yes_no "Wait for the bootstrap to finish?" y; then
+    wait_for_coolify
+    print_credentials
   fi
 
   ok "server redeployed"
@@ -553,6 +627,7 @@ cmd_full() {
   ask_location
   ask_server_type
   ask_ssh_keys
+  ask_vyhub_settings
   ask_registry_login
   ask_env_vars
   ask_backups
@@ -561,36 +636,36 @@ cmd_full() {
   cmd_outputs
   print_dns_instructions
 
-  if prompt_yes_no "Wait for cloud-init to finish now?" y; then
-    wait_for_cloud_init
+  say ""
+  warn "Set the DNS records above NOW. Let's Encrypt will fail until they resolve."
+  say ""
+
+  if prompt_yes_no "Wait for the bootstrap (Coolify install + VyHub deploy) to finish?" y; then
+    wait_for_coolify
   fi
 
-  if prompt_yes_no "Provision a Let's Encrypt certificate now? (DNS must already point to the server)" y; then
-    run_certbot
-  else
-    say "You can run \`$0 certbot\` later once DNS has propagated."
-  fi
+  print_credentials
 
   section "Done"
-  local frontend
-  frontend="$(jq -r '.vyhub_env.VYHUB_FRONTEND_URL' "$TFVARS_FILE")"
-  ok "VyHub onprem should now be reachable at $frontend"
+  ok "Setup complete. Log in to Coolify with the credentials above."
 }
 
 main() {
   local cmd="${1:-full}"
   case "$cmd" in
-    full|"")    cmd_full ;;
-    apply)      cmd_apply ;;
-    outputs)    cmd_outputs ;;
-    ssh)        shift || true; cmd_ssh "$@" ;;
-    wait)       cmd_wait ;;
-    certbot)    cmd_certbot ;;
-    redeploy)   cmd_redeploy ;;
-    destroy)    cmd_destroy ;;
+    full|"")      cmd_full ;;
+    apply)        cmd_apply ;;
+    outputs)      cmd_outputs ;;
+    ssh)          shift || true; cmd_ssh "$@" ;;
+    tunnel)       shift || true; cmd_tunnel "$@" ;;
+    wait)         cmd_wait ;;
+    credentials)  cmd_credentials ;;
+    logs)         cmd_logs ;;
+    redeploy)     cmd_redeploy ;;
+    destroy)      cmd_destroy ;;
     -h|--help|help)
       sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
-    *)          die "unknown subcommand: $cmd (try --help)" ;;
+    *)            die "unknown subcommand: $cmd (try --help)" ;;
   esac
 }
 

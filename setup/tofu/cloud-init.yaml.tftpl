@@ -9,9 +9,6 @@ package_upgrade: true
 packages:
   - ca-certificates
   - curl
-  - git
-  - openssl
-  - certbot
   - unattended-upgrades
   - fail2ban
   - jq
@@ -31,108 +28,352 @@ write_files:
       APT::Periodic::Update-Package-Lists "1";
       APT::Periodic::Unattended-Upgrade "1";
 
-  - path: /etc/vyhub-onprem.env
+  - path: /opt/vyhub/db/init/create_user.sh
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/bin/bash
+      set -e
+      psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
+      	CREATE USER "$POSTGRES_VYHUB_USER" PASSWORD '$POSTGRES_VYHUB_PASSWORD';
+      	ALTER DATABASE "$POSTGRES_DB" OWNER TO "$POSTGRES_VYHUB_USER";
+      EOSQL
+
+  - path: /opt/vyhub/db/init/load_extensions.sql
+    permissions: '0644'
+    owner: root:root
+    content: |
+      CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+  - path: /opt/vyhub/loki/loki-config.yaml
+    permissions: '0644'
+    owner: root:root
+    content: |
+      auth_enabled: false
+
+      server:
+        http_listen_port: 3100
+
+      common:
+        path_prefix: /loki
+        storage:
+          filesystem:
+            chunks_directory: /loki/chunks
+            rules_directory: /loki/rules
+        replication_factor: 1
+        ring:
+          kvstore:
+            store: inmemory
+
+      schema_config:
+        configs:
+          - from: 2020-10-24
+            store: boltdb-shipper
+            object_store: filesystem
+            schema: v11
+            index:
+              prefix: index_
+              period: 24h
+
+      ruler:
+        alertmanager_url: http://localhost:9093
+
+      limits_config:
+        max_query_length: 0
+        split_queries_by_interval: 10d
+        reject_old_samples: false
+
+      analytics:
+        reporting_enabled: false
+
+  - path: /etc/vyhub-coolify/vyhub.env.json
     permissions: '0600'
     owner: root:root
     content: |
-${join("\n", [for k, v in vyhub_env : "      ${k}=${jsonencode(v)}"])}
-%{ if registry_url != "" ~}
+      ${jsonencode(vyhub_env)}
 
-  - path: /etc/vyhub-registry.env
-    permissions: '0600'
-    owner: root:root
-    content: |
-      ${registry_url}
-      ${registry_user}
-      ${registry_password}
-%{ endif ~}
-
-  - path: /usr/local/sbin/vyhub-bootstrap.sh
+  - path: /usr/local/sbin/vyhub-coolify-bootstrap.sh
     permissions: '0755'
     owner: root:root
     content: |
       #!/usr/bin/env bash
       set -euo pipefail
 
-      REPO_URL="${repo_url}"
-      REPO_REF="${repo_ref}"
-      TARGET=/opt/vyhub-onprem
-      USER_ENV=/etc/vyhub-onprem.env
+      VYHUB_FQDN='${vyhub_fqdn}'
+      ADMIN_EMAIL='${coolify_admin_email}'
+      ADMIN_PASSWORD='${coolify_admin_password}'
+      REGISTRY_URL='${registry_url}'
+      REGISTRY_USER='${registry_user}'
+      REGISTRY_PASSWORD='${registry_password}'
 
-      echo "[vyhub-bootstrap] installing Docker..."
-      if ! command -v docker >/dev/null 2>&1; then
-        curl -fsSL https://get.docker.com | sh
-      fi
-      systemctl enable --now docker
+      COOLIFY_ENV=/data/coolify/source/.env
+      VYHUB_ENV_FILE=/etc/vyhub-coolify/vyhub.env.json
+      TOKEN_FILE=/root/.coolify-api-token
+      LOG=/var/log/vyhub-coolify-bootstrap.log
 
-      echo "[vyhub-bootstrap] cloning $REPO_URL@$REPO_REF -> $TARGET"
-      if [ ! -d "$TARGET/.git" ]; then
-        git clone --branch "$REPO_REF" "$REPO_URL" "$TARGET"
-      fi
+      log() { printf '[%s] %s\n' "$(date -u +%FT%TZ)" "$*" | tee -a "$LOG"; }
 
-      cd "$TARGET"
-
-      if [ ! -f .env ] && [ ! -f docker-compose.override.yml ]; then
-        echo "[vyhub-bootstrap] running first-setup.sh"
-        bash ./first-setup.sh
-      fi
-
-      echo "[vyhub-bootstrap] merging user-supplied VyHub env vars"
-      # Insert the user-supplied vars at the designated marker line and drop
-      # any later duplicate key definitions left by the template.
-      awk -v src="$USER_ENV" '
-        BEGIN {
-          n = 0
-          while ((getline line < src) > 0) {
-            if (line ~ /^[[:space:]]*#/ || line ~ /^[[:space:]]*$/) continue
-            eq = index(line, "=")
-            if (!eq) continue
-            userkeys[substr(line, 1, eq-1)] = 1
-            userlines[n++] = line
-          }
-        }
-        /# INSERT CONFIG FROM THE SETUP DIALOG ABOVE/ {
-          print
-          for (i = 0; i < n; i++) print userlines[i]
-          next
-        }
-        {
-          eq = index($0, "=")
-          if (eq > 0 && substr($0, 1, eq-1) in userkeys) next
-          print
-        }
-      ' .env > .env.tmp
-      mv .env.tmp .env
-      chmod 644 .env
-
-      mkdir -p nginx/certs
-      if [ ! -f nginx/certs/vyhub.crt ]; then
-        echo "[vyhub-bootstrap] generating placeholder self-signed cert"
-        openssl req -x509 -nodes -newkey rsa:2048 -days 30 \
-          -subj "/CN=$(hostname -f)" \
-          -keyout nginx/certs/vyhub.key \
-          -out    nginx/certs/vyhub.crt
-        chmod 600 nginx/certs/vyhub.key
+      # --- 1. Install Coolify ---------------------------------------------------
+      log "installing Coolify"
+      if [ ! -f "$COOLIFY_ENV" ]; then
+        curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash >>"$LOG" 2>&1
+      else
+        log "Coolify already installed; skipping"
       fi
 
-      echo "[vyhub-bootstrap] starting docker compose stack"
-      if [ -f /etc/vyhub-registry.env ]; then
-        _REG_URL="$(sed -n '1p' /etc/vyhub-registry.env)"
-        _REG_USER="$(sed -n '2p' /etc/vyhub-registry.env)"
-        echo "[vyhub-bootstrap] logging in to container registry $_REG_URL"
-        sed -n '3p' /etc/vyhub-registry.env \
-          | docker login "$_REG_URL" -u "$_REG_USER" --password-stdin
-        unset _REG_URL _REG_USER
-        rm -f /etc/vyhub-registry.env
+      # --- 2a. Generate SSH key for Coolify → localhost connection -------------
+      if [ ! -f /root/.coolify-local-key ]; then
+        ssh-keygen -t ed25519 -f /root/.coolify-local-key -N "" -C "coolify-localhost" >>"$LOG" 2>&1
+        cat /root/.coolify-local-key.pub >> /root/.ssh/authorized_keys
+        log "generated Coolify localhost SSH key"
       fi
-      docker compose pull
-      docker compose up -d
 
-      echo "[vyhub-bootstrap] done"
-      date -u +%FT%TZ > /var/lib/vyhub-onprem-ready
+      # --- 2. Wait for Coolify API ---------------------------------------------
+      log "waiting for Coolify API"
+      for i in $(seq 1 90); do
+        curl -sf http://localhost:8000/api/health >/dev/null 2>&1 && break
+        sleep 10
+      done
+      if ! curl -sf http://localhost:8000/api/health >/dev/null 2>&1; then
+        log "ERROR: Coolify did not become healthy after 15 min"
+        exit 1
+      fi
+
+      # --- 3. Bootstrap admin user + root team + API token ---------------------
+      # Coolify v4 seeders don't consume ROOT_USER_* env vars, so we insert the
+      # user, root team (id=0), pivot row, and a Sanctum token directly into
+      # Postgres. All statements are ON CONFLICT-safe.
+      log "bootstrapping admin"
+
+      get_env() {
+        local val
+        val=$(grep -E "^$1=" "$COOLIFY_ENV" 2>/dev/null | head -1 | cut -d= -f2-)
+        val="$${val#\"}"; val="$${val%\"}"
+        val="$${val#\'}"; val="$${val%\'}"
+        printf '%s' "$val"
+      }
+      DB_USER=$(get_env DB_USERNAME); [ -n "$DB_USER" ] || DB_USER=coolify
+      DB_NAME=$(get_env DB_DATABASE); [ -n "$DB_NAME" ] || DB_NAME=coolify
+      DB_PASS=$(get_env DB_PASSWORD)
+
+      DB_CONT=$(docker ps --format '{{.Names}}' | grep -E '^coolify-db$' | head -1 || true)
+      [ -n "$DB_CONT" ] || DB_CONT=$(docker ps --format '{{.Names}}' | grep -i postgres | head -1 || true)
+
+      PW_HASH=$(printf '%s' "$ADMIN_PASSWORD" | docker exec -i coolify \
+        php -r 'echo password_hash(stream_get_contents(STDIN), PASSWORD_BCRYPT);' \
+        2>>"$LOG" || true)
+
+      sql_q() { printf '%s' "$1" | sed "s/'/''/g"; }
+      ESC_EMAIL=$(sql_q "$ADMIN_EMAIL")
+      ESC_HASH=$(sql_q "$PW_HASH")
+
+      TOKEN_PLAIN=$(openssl rand -hex 32)
+      TOKEN_HASH=$(printf '%s' "$TOKEN_PLAIN" | sha256sum | awk '{print $1}')
+
+      if [ -z "$DB_CONT" ] || [ -z "$PW_HASH" ]; then
+        log "WARN: prerequisites missing (db=$${DB_CONT:-?} pw=$${PW_HASH:+set}); set admin in Coolify UI"
+      else
+        docker exec -i -e PGPASSWORD="$DB_PASS" "$DB_CONT" \
+          psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 >>"$LOG" 2>&1 <<SQL \
+          || log "WARN: admin SQL failed; finish in Coolify UI"
+      BEGIN;
+      INSERT INTO users (name, email, password, email_verified_at, created_at, updated_at)
+      VALUES ('Admin', '$ESC_EMAIL', '$ESC_HASH', NOW(), NOW(), NOW())
+      ON CONFLICT (email) DO UPDATE
+        SET password = EXCLUDED.password, email_verified_at = NOW(), updated_at = NOW();
+
+      INSERT INTO teams (id, name, personal_team, created_at, updated_at)
+      VALUES (0, 'Root Team', true, NOW(), NOW())
+      ON CONFLICT (id) DO NOTHING;
+
+      INSERT INTO team_user (user_id, team_id, role, created_at, updated_at)
+      SELECT u.id, 0, 'owner', NOW(), NOW() FROM users u WHERE u.email = '$ESC_EMAIL'
+      ON CONFLICT (user_id, team_id) DO NOTHING;
+
+      DELETE FROM personal_access_tokens WHERE name = 'automation';
+      INSERT INTO personal_access_tokens
+        (tokenable_type, tokenable_id, name, token, abilities, team_id, created_at, updated_at)
+      SELECT 'App\Models\User', u.id, 'automation', '$TOKEN_HASH', '["*"]', 0, NOW(), NOW()
+      FROM users u WHERE u.email = '$ESC_EMAIL';
+      COMMIT;
+      SQL
+
+        docker exec -i -e PGPASSWORD="$DB_PASS" "$DB_CONT" \
+          psql -U "$DB_USER" -d "$DB_NAME" \
+          -c "UPDATE instance_settings SET is_api_enabled = true;" \
+          >>"$LOG" 2>&1 || log "WARN: could not enable API; enable manually in Coolify UI"
+
+        TOKEN_ID=$(docker exec -e PGPASSWORD="$DB_PASS" "$DB_CONT" \
+          psql -U "$DB_USER" -d "$DB_NAME" -tA \
+          -c "SELECT id FROM personal_access_tokens WHERE token = '$TOKEN_HASH'" \
+          2>>"$LOG" | tr -d '[:space:]' || true)
+
+        if [ -n "$TOKEN_ID" ]; then
+          printf '%s|%s' "$TOKEN_ID" "$TOKEN_PLAIN" > "$TOKEN_FILE"
+          chmod 600 "$TOKEN_FILE"
+          log "admin bootstrapped; token id=$TOKEN_ID"
+        else
+          log "WARN: could not read token id; deploy step will be skipped"
+        fi
+      fi
+
+      # --- 4. Registry login ---------------------------------------------------
+      if [ -n "$REGISTRY_URL" ] && [ -n "$REGISTRY_USER" ]; then
+        log "docker login $REGISTRY_URL"
+        printf '%s' "$REGISTRY_PASSWORD" \
+          | docker login "$REGISTRY_URL" -u "$REGISTRY_USER" --password-stdin \
+          >>"$LOG" 2>&1 || log "WARN: docker login failed"
+      fi
+
+      # --- 5. Deploy VyHub via Coolify API -------------------------------------
+      if [ -s "$TOKEN_FILE" ]; then
+        log "deploying VyHub"
+        /usr/local/sbin/vyhub-coolify-deploy.sh >>"$LOG" 2>&1 \
+          || log "WARN: API deploy failed; finish in Coolify UI"
+      fi
+
+      # --- 6. Done -------------------------------------------------------------
+      date -u +%FT%TZ > /var/lib/vyhub-coolify-ready
+      log "bootstrap complete"
+      shred -u "$VYHUB_ENV_FILE" 2>/dev/null || rm -f "$VYHUB_ENV_FILE"
+
+  - path: /usr/local/sbin/vyhub-coolify-deploy.sh
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      TOKEN="$(cat /root/.coolify-api-token)"
+      VYHUB_FQDN='${vyhub_fqdn}'
+      REGISTRY_URL='${registry_url}'
+      REGISTRY_USER='${registry_user}'
+      REGISTRY_PASSWORD='${registry_password}'
+      COMPOSE_URL='${compose_url}'
+      VYHUB_ENV_FILE=/etc/vyhub-coolify/vyhub.env.json
+
+      # -f is intentionally absent: we want curl to always exit 0 so set -e
+      # doesn't silently kill the script on HTTP errors. We check the response
+      # body instead and print it on failure for easier debugging.
+      api() {
+        curl -s -H "Authorization: Bearer $TOKEN" \
+             -H "Content-Type: application/json" \
+             -H "Accept: application/json" \
+             "$@"
+      }
+      uuid_of() { printf '%s' "$1" | jq -r '.uuid // empty'; }
+
+      # --- register server if not already present ------------------------------
+      echo "[deploy] checking for registered servers"
+      RESP=$(api http://localhost:8000/api/v1/servers)
+      SERVER_UUID=$(printf '%s' "$RESP" | jq -r 'if type=="array" then .[0].uuid else .uuid end // empty')
+
+      if [ -z "$SERVER_UUID" ]; then
+        echo "[deploy] no server found; registering localhost"
+        KEY_FILE=/root/.coolify-local-key
+        if [ ! -f "$KEY_FILE" ]; then
+          echo "[deploy] ERROR: SSH key not found at $KEY_FILE"; exit 1
+        fi
+
+        RESP=$(api -X POST http://localhost:8000/api/v1/security/keys \
+          -d "$(jq -n --arg k "$(cat "$KEY_FILE")" '{name:"localhost",private_key:$k}')")
+        KEY_UUID=$(uuid_of "$RESP")
+        if [ -z "$KEY_UUID" ]; then
+          echo "[deploy] ERROR: key registration failed: $RESP"; exit 1
+        fi
+        echo "[deploy] key_uuid=$KEY_UUID"
+
+        RESP=$(api -X POST http://localhost:8000/api/v1/servers \
+          -d "$(jq -n --arg ku "$KEY_UUID" \
+            '{name:"localhost",ip:"localhost",port:22,user:"root",private_key_uuid:$ku}')")
+        SERVER_UUID=$(uuid_of "$RESP")
+        if [ -z "$SERVER_UUID" ]; then
+          echo "[deploy] ERROR: server registration failed: $RESP"; exit 1
+        fi
+        echo "[deploy] server_uuid=$SERVER_UUID"
+      else
+        echo "[deploy] server_uuid=$SERVER_UUID"
+      fi
+
+      # --- wait for server to become reachable ---------------------------------
+      echo "[deploy] waiting for server to become reachable"
+      REACHABLE=false
+      for i in $(seq 1 24); do
+        REACHABLE=$(api "http://localhost:8000/api/v1/servers/$SERVER_UUID" \
+          | jq -r '.is_reachable // false')
+        [ "$REACHABLE" = "true" ] && break
+        sleep 5
+      done
+      if [ "$REACHABLE" != "true" ]; then
+        echo "[deploy] WARN: server not marked reachable after 2 min; proceeding anyway"
+      fi
+
+      # --- private registry ----------------------------------------------------
+      if [ -n "$REGISTRY_URL" ] && [ -n "$REGISTRY_USER" ]; then
+        echo "[deploy] registering registry $REGISTRY_URL"
+        api -X POST http://localhost:8000/api/v1/private-registries \
+          -d "$(jq -n --arg n "vyhub-registry" --arg u "$REGISTRY_URL" \
+                --arg user "$REGISTRY_USER" --arg pass "$REGISTRY_PASSWORD" \
+                '{name:$n,url:$u,username:$user,password:$pass}')" \
+          >/dev/null || echo "[deploy] WARN: registry registration failed"
+      fi
+
+      # --- project -------------------------------------------------------------
+      echo "[deploy] creating project"
+      RESP=$(api -X POST http://localhost:8000/api/v1/projects \
+        -d '{"name":"vyhub-onprem","description":"VyHub on-prem stack"}')
+      PROJECT_UUID=$(uuid_of "$RESP")
+      if [ -z "$PROJECT_UUID" ]; then
+        PROJECT_UUID=$(api http://localhost:8000/api/v1/projects \
+          | jq -r '.[] | select(.name=="vyhub-onprem") | .uuid' | head -n1)
+      fi
+      if [ -z "$PROJECT_UUID" ]; then
+        echo "[deploy] ERROR: project creation failed: $RESP"; exit 1
+      fi
+      echo "[deploy] project_uuid=$PROJECT_UUID"
+
+      # --- application ---------------------------------------------------------
+      COMPOSE_B64=$(curl -fsSL "$COMPOSE_URL" | base64 -w0)
+
+      echo "[deploy] creating application"
+      RESP=$(api -X POST http://localhost:8000/api/v1/applications/dockercompose \
+        -d "$(jq -n \
+          --arg pu "$PROJECT_UUID" --arg su "$SERVER_UUID" --arg compose "$COMPOSE_B64" \
+          '{project_uuid:$pu,server_uuid:$su,environment_name:"production",
+            name:"vyhub",docker_compose_raw:$compose,instant_deploy:false}')")
+      APP_UUID=$(uuid_of "$RESP")
+      if [ -z "$APP_UUID" ]; then
+        echo "[deploy] ERROR: app creation failed: $RESP"; exit 1
+      fi
+      echo "[deploy] app_uuid=$APP_UUID"
+
+      # --- environment variables -----------------------------------------------
+      echo "[deploy] setting env vars"
+      jq -c 'to_entries[]' "$VYHUB_ENV_FILE" | while IFS= read -r entry; do
+        key=$(printf '%s' "$entry" | jq -r '.key')
+        val=$(printf '%s' "$entry" | jq -r '.value')
+        [ -z "$key" ] && continue
+        api -X POST "http://localhost:8000/api/v1/applications/$APP_UUID/envs" \
+          -d "$(jq -n --arg k "$key" --arg v "$val" \
+              '{key:$k,value:$v,is_preview:false,is_build_time:false}')" \
+          >/dev/null || echo "[deploy] WARN: failed to set $key"
+      done
+
+      api -X POST "http://localhost:8000/api/v1/applications/$APP_UUID/envs" \
+        -d "$(jq -n --arg v "https://$VYHUB_FQDN" \
+            '{key:"SERVICE_FQDN_APP",value:$v,is_preview:false,is_build_time:false}')" \
+        >/dev/null || true
+
+      # --- start ---------------------------------------------------------------
+      echo "[deploy] starting deployment"
+      api -X POST "http://localhost:8000/api/v1/applications/$APP_UUID/start" >/dev/null \
+        || echo "[deploy] WARN: could not trigger start; do it in the UI"
+
+      echo "[deploy] done"
 
 runcmd:
   - [ systemctl, enable, --now, fail2ban ]
-  - [ /usr/local/sbin/vyhub-bootstrap.sh ]
+  - [ install, -d, -m, '0700', /etc/vyhub-coolify ]
+  - [ /usr/local/sbin/vyhub-coolify-bootstrap.sh ]
 
 final_message: "vyhub-onprem cloud-init finished after $UPTIME seconds"
