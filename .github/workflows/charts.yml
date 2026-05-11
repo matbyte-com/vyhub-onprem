@@ -3,7 +3,7 @@ name: Release Charts
 on:
   push:
     branches:
-      - master
+      - '**'
 
 jobs:
   release:
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -25,6 +25,30 @@ jobs:
         uses: azure/setup-helm@v4
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      # On master we ship the chart as-is (name=vyhub, version=Chart.yaml).
+      # On every other branch we ship the same chart contents under the name
+      # `vyhub-test` with the SemVer pre-release tag `<version>-<branch>` so
+      # feature branches publish testable artifacts without colliding with
+      # production releases.
+      - name: Rewrite Chart.yaml for non-master branches
+        if: github.ref_name != 'master'
+        run: |
+          set -euo pipefail
+          BRANCH="${GITHUB_REF_NAME}"
+          # SemVer pre-release identifiers may only contain [0-9A-Za-z-];
+          # squash anything else into a single dash and trim.
+          SANITIZED="$(printf '%s' "$BRANCH" \
+            | tr -c 'a-zA-Z0-9-' '-' \
+            | sed -E 's/-+/-/g; s/^-//; s/-$//')"
+          BASE_VERSION="$(yq -r '.version' charts/vyhub/Chart.yaml)"
+          NEW_VERSION="${BASE_VERSION}-${SANITIZED}"
+          echo "Publishing as vyhub-test@${NEW_VERSION}"
+          yq -i ".name = \"vyhub-test\" | .version = \"${NEW_VERSION}\"" \
+            charts/vyhub/Chart.yaml
+
+      - name: Update chart dependencies
+        run: helm dependency update charts/vyhub
 
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.6.0

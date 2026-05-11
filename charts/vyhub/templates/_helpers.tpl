@@ -95,6 +95,20 @@ Create the name of the service account to use for the VyHub PDF API.
 {{- end -}}
 
 {{/*
+Resolve the URL to push logs to Loki.
+
+If app.config.logging.lokiUrl is explicitly set, use it as-is. Otherwise, when
+the bundled loki subchart is enabled, point at the in-cluster gateway service.
+*/}}
+{{- define "vyhub.lokiUrl" -}}
+{{- with .Values.app.config.logging.lokiUrl -}}
+{{- . -}}
+{{- else if .Values.loki.enabled -}}
+{{- printf "http://%s-loki-gateway.%s.svc.%s" .Release.Name .Release.Namespace .Values.clusterDomain -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Return true if cert-manager required annotations for TLS signed certificates are set in the Ingress annotations
 Ref: https://cert-manager.io/docs/usage/ingress/#supported-annotations
 */}}

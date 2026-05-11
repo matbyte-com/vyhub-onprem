@@ -31,5 +31,5 @@ data:
   VYHUB_DATABASE_MAX_WAIT: "{{ .database.maxWait }}"
   VYHUB_DATABASE_POOL_SIZE: "{{ .database.poolSize }}"
   VYHUB_DATABASE_POOL_OVERFLOW: "{{ .database.poolOverflow }}"
-  VYHUB_LOGGING_LOKI_URL: "{{ .logging.lokiUrl }}"
+  VYHUB_LOGGING_LOKI_URL: {{ include "vyhub.lokiUrl" $ | quote }}
   {{- end }}
