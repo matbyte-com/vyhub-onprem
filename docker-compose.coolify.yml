@@ -1,0 +1,55 @@
+# Docker Compose file for deployment via Coolify.
+#
+# Differences from docker-compose.yml:
+#  - No nginx: Coolify's Traefik handles TLS termination and reverse proxying.
+#    The app service is exposed via Traefik labels.
+#  - No .env mount: env vars are injected by Coolify.
+#  - No ./web mount: deploy the frontend as a separate Coolify static site resource.
+#  - No db-backup: use Coolify's built-in scheduled database backup feature instead.
+#  - Absolute paths for host mounts (pre-created by cloud-init under /opt/vyhub/).
+
+services:
+  app:
+    image: registry.matbyte.com/vyhub/vyhub-onprem:latest
+    depends_on:
+      - db
+      - geoip-api
+      - pdf-api
+      - loki
+    command: python -m scripts.server_run
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.vyhub-app.rule=Host(`${SERVICE_FQDN_APP}`) && PathPrefix(`/api`)
+      - traefik.http.routers.vyhub-app.entrypoints=https
+      - traefik.http.routers.vyhub-app.tls=true
+      - traefik.http.routers.vyhub-app.tls.certresolver=letsencrypt
+      - traefik.http.services.vyhub-app.loadbalancer.server.port=5050
+      - traefik.http.middlewares.vyhub-strip.stripprefix.prefixes=/api
+      - traefik.http.routers.vyhub-app.middlewares=vyhub-strip
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: vyhub
+      POSTGRES_VYHUB_USER: vyhub
+      POSTGRES_VYHUB_PASSWORD: ${POSTGRES_VYHUB_PASSWORD}
+    volumes:
+      - /opt/vyhub/db/init:/docker-entrypoint-initdb.d
+      - vyhub-db:/var/lib/postgresql/data
+  geoip-api:
+    image: observabilitystack/geoip-api:latest
+  pdf-api:
+    image: ghcr.io/matbyte-com/htmltopdf-api:1.1.0
+    stop_signal: SIGKILL
+  loki:
+    image: grafana/loki:2.8.0
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - /opt/vyhub/loki/loki-config.yaml:/etc/loki/local-config.yaml
+      - vyhub-loki:/loki
+
+volumes:
+  vyhub-db:
+  vyhub-loki:
