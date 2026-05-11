@@ -25,4 +25,21 @@ entries:
     urls:
     - https://github.com/matbyte-com/vyhub-onprem/releases/download/vyhub-0.1.0/vyhub-0.1.0.tgz
     version: 0.1.0
-generated: "2024-12-16T12:33:58.647698559Z"
+  vyhub-test:
+  - apiVersion: v2
+    created: "2026-05-11T18:53:10.279229317Z"
+    dependencies:
+    - name: common
+      repository: oci://registry-1.docker.io/bitnamicharts
+      version: ^2.23.0
+    - condition: loki.enabled
+      name: loki
+      repository: https://grafana.github.io/helm-charts
+      version: ^6.16.0
+    digest: e24bf3009edaf1f694fd96799e50e51cda9dadd7838404abbae1f4bc28a9f596
+    name: vyhub-test
+    type: application
+    urls:
+    - https://github.com/matbyte-com/vyhub-onprem/releases/download/vyhub-test-1.0.0-setup-k8s/vyhub-test-1.0.0-setup-k8s.tgz
+    version: 1.0.0-setup-k8s
+generated: "2026-05-11T18:53:10.279242557Z"
