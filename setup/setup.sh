@@ -278,8 +278,15 @@ ask_vyhub_settings() {
   say "  Coolify's admin UI is not publicly exposed. Use: $0 tunnel"
   COOLIFY_ADMIN_EMAIL="$(prompt "Admin email (used for Coolify login + Let's Encrypt notices)")"
   [ -n "$COOLIFY_ADMIN_EMAIL" ] || die "admin email is required"
-  COOLIFY_ADMIN_PASSWORD="$(generate_password)"
-  ok "generated 32-char admin password (will be shown at the end)"
+  if [ -f "$TFVARS_FILE" ]; then
+    COOLIFY_ADMIN_PASSWORD="$(jq -r '.coolify_admin_password // empty' "$TFVARS_FILE")"
+  fi
+  if [ -z "$COOLIFY_ADMIN_PASSWORD" ]; then
+    COOLIFY_ADMIN_PASSWORD="$(generate_password)"
+    ok "generated 32-char admin password (will be shown at the end)"
+  else
+    ok "using existing admin password from $TFVARS_FILE"
+  fi
 }
 
 ask_registry_login() {
@@ -598,14 +605,6 @@ cmd_redeploy() {
   local reply
   read -r reply
   [ "$reply" = "$server_name" ] || die "confirmation did not match — aborted"
-
-  # Rotate the admin password so the old one is invalidated on the new server.
-  local new_pw tmp
-  new_pw="$(generate_password)"
-  tmp="$(mktemp)"
-  jq --arg pw "$new_pw" '.coolify_admin_password = $pw' "$TFVARS_FILE" > "$tmp"
-  mv "$tmp" "$TFVARS_FILE"
-  chmod 600 "$TFVARS_FILE"
 
   load_hcloud_token
   _do_destroy
