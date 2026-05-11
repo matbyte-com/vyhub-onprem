@@ -47,6 +47,15 @@ jobs:
           yq -i ".name = \"vyhub-test\" | .version = \"${NEW_VERSION}\"" \
             charts/vyhub/Chart.yaml
 
+      # chart-releaser's `cr package` shells out to `helm dependency build`,
+      # which only resolves repository: URLs that are already registered with
+      # the local helm client. (OCI deps like bitnamicharts work without
+      # `repo add`; classic https:// repos do not.)
+      - name: Register chart dependency repositories
+        run: |
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo update
+
       - name: Update chart dependencies
         run: helm dependency update charts/vyhub
 
