@@ -360,7 +360,7 @@ write_files:
         # remove any keys we're about to write so there are no duplicates
         KEYS=$(jq -r 'keys[]' "$VYHUB_ENV_FILE")
         for key in $KEYS SERVICE_FQDN_APP; do
-          sed -i "/^${key}=/d" "$SERVICE_ENV_FILE"
+          sed -i "/^$${key}=/d" "$SERVICE_ENV_FILE"
         done
         jq -r 'to_entries[] | "\(.key)=\(.value)"' "$VYHUB_ENV_FILE" >> "$SERVICE_ENV_FILE"
         printf 'SERVICE_FQDN_APP=https://%s\n' "$VYHUB_FQDN" >> "$SERVICE_ENV_FILE"
