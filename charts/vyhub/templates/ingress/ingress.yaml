@@ -10,7 +10,7 @@ metadata:
   annotations: {{- include "common.tplvalues.render" ( dict "value" $annotations "context" $ ) | nindent 4 }}
   {{- end }}
 spec:
-  {{- if and .Values.ingress.ingressClassName (eq "true" (include "common.ingress.supportsIngressClassname" .)) }}
+  {{- if .Values.ingress.ingressClassName }}
   ingressClassName: {{ .Values.ingress.ingressClassName | quote }}
   {{- end }}
   rules:
@@ -22,14 +22,10 @@ spec:
           {{- toYaml .Values.ingress.extraPaths | nindent 10 }}
           {{- end }}
           - path: {{ .Values.ingress.path }}
-            {{- if eq "true" (include "common.ingress.supportsPathType" .) }}
             pathType: {{ .Values.ingress.pathType }}
-            {{- end }}
             backend: {{- include "common.ingress.backend" (dict "serviceName" (include "vyhub.app.name" .) "servicePort" "frontend-http" "context" $)  | nindent 14 }}
           - path: {{ .Values.ingress.appPath }}
-            {{- if eq "true" (include "common.ingress.supportsPathType" .) }}
             pathType: {{ .Values.ingress.pathType }}
-            {{- end }}
             backend: {{- include "common.ingress.backend" (dict "serviceName" (include "vyhub.app.name" .) "servicePort" "app-http" "context" $)  | nindent 14 }}
     {{- end }}
     {{- range .Values.ingress.extraHosts }}
@@ -37,14 +33,10 @@ spec:
       http:
         paths:
           - path: {{ default "/" .path }}
-            {{- if eq "true" (include "common.ingress.supportsPathType" $) }}
             pathType: {{ default "ImplementationSpecific" .pathType }}
-            {{- end }}
             backend: {{- include "common.ingress.backend" (dict "serviceName" (include "vyhub.app.name" $) "servicePort" "frontend-http" "context" $) | nindent 14 }}
           - path: {{ default "/api" .appPath }}
-            {{- if eq "true" (include "common.ingress.supportsPathType" $) }}
             pathType: {{ default "ImplementationSpecific" .pathType }}
-            {{- end }}
             backend: {{- include "common.ingress.backend" (dict "serviceName" (include "vyhub.app.name" $) "servicePort" "app-http" "context" $) | nindent 14 }}
     {{- end }}
     {{- if .Values.ingress.extraRules }}

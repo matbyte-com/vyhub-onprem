@@ -20,6 +20,20 @@ Return the common name for pdfApi componentes
 {{- end -}}
 
 {{/*
+Return the common name for the bundled PostgreSQL StatefulSet.
+*/}}
+{{- define "vyhub.postgresql.name" -}}
+  {{- printf "%s-postgresql" .Release.Name | trunc 63 -}}
+{{- end -}}
+
+{{/*
+Return the common name for the bundled PostgreSQL backup workload.
+*/}}
+{{- define "vyhub.postgresql.backup.name" -}}
+  {{- printf "%s-postgresql-backup" .Release.Name | trunc 63 -}}
+{{- end -}}
+
+{{/*
 Return the proper VyHub app image name
 */}}
 {{- define "vyhub.app.image" -}}
@@ -101,8 +115,8 @@ If app.config.logging.lokiUrl is explicitly set, use it as-is. Otherwise, when
 the bundled loki subchart is enabled, point at the in-cluster gateway service.
 */}}
 {{- define "vyhub.lokiUrl" -}}
-{{- with .Values.app.config.logging.lokiUrl -}}
-{{- . -}}
+{{- if .Values.app.config.logging.lokiUrl -}}
+{{- .Values.app.config.logging.lokiUrl -}}
 {{- else if .Values.loki.enabled -}}
 {{- printf "http://%s-loki-gateway.%s.svc.%s" .Release.Name .Release.Namespace .Values.clusterDomain -}}
 {{- end -}}

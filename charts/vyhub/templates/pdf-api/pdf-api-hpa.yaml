@@ -26,7 +26,7 @@ spec:
         {{- else }}
         target:
           type: Utilization
-          averageUtilization: {{ .Values.worker.autoscaling.hpa.targetMemory }}
+          averageUtilization: {{ .Values.pdfApi.autoscaling.hpa.targetMemory }}
         {{- end }}
     {{- end }}
     {{- if .Values.pdfApi.autoscaling.hpa.targetCPU }}
@@ -38,7 +38,7 @@ spec:
         {{- else }}
         target:
           type: Utilization
-          averageUtilization: {{ .Values.worker.autoscaling.hpa.targetCPU }}
+          averageUtilization: {{ .Values.pdfApi.autoscaling.hpa.targetCPU }}
         {{- end }}
     {{- end }}
 {{- end }}
