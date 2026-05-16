@@ -6,6 +6,14 @@ terraform {
       source  = "hetznercloud/hcloud"
       version = "~> 1.48"
     }
+    talos = {
+      source  = "siderolabs/talos"
+      version = "~> 0.7"
+    }
+    http = {
+      source  = "hashicorp/http"
+      version = "~> 3.4"
+    }
   }
 }
 

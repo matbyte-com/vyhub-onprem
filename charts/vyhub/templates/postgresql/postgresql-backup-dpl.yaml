@@ -1,0 +1,77 @@
+{{- if and .Values.postgresql.enabled .Values.postgresql.backup.enabled }}
+{{- $secretName := default (include "vyhub.postgresql.name" .) .Values.postgresql.auth.existingSecret }}
+{{- $passKey := .Values.postgresql.auth.secretKeys.userPasswordKey }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vyhub.postgresql.backup.name" . }}
+  namespace: {{ include "common.names.namespace" . | quote }}
+  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: postgresql-backup
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {{- include "common.labels.matchLabels" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 6 }}
+      app.kubernetes.io/component: postgresql-backup
+  template:
+    metadata:
+      labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 8 }}
+        app.kubernetes.io/component: postgresql-backup
+    spec:
+      containers:
+        - name: backup
+          image: "{{ .Values.postgresql.backup.image.registry }}/{{ .Values.postgresql.backup.image.repository }}:{{ .Values.postgresql.backup.image.tag }}"
+          imagePullPolicy: {{ .Values.postgresql.backup.image.pullPolicy }}
+          env:
+            - name: POSTGRES_HOST
+              value: {{ include "vyhub.postgresql.name" . | quote }}
+            - name: POSTGRES_PORT
+              value: {{ .Values.postgresql.service.port | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.postgresql.auth.database | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.postgresql.auth.username | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ $passKey }}
+            - name: SCHEDULE
+              value: {{ .Values.postgresql.backup.schedule | quote }}
+            - name: BACKUP_KEEP_DAYS
+              value: {{ .Values.postgresql.backup.keepDays | quote }}
+            - name: BACKUP_KEEP_WEEKS
+              value: {{ .Values.postgresql.backup.keepWeeks | quote }}
+            - name: BACKUP_KEEP_MONTHS
+              value: {{ .Values.postgresql.backup.keepMonths | quote }}
+            - name: POSTGRES_EXTRA_OPTS
+              value: {{ .Values.postgresql.backup.extraOpts | quote }}
+            - name: HEALTHCHECK_PORT
+              value: "8080"
+          ports:
+            - name: healthcheck
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /
+              port: healthcheck
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+          {{- if .Values.postgresql.backup.resources }}
+          resources: {{- toYaml .Values.postgresql.backup.resources | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: backups
+              mountPath: /backups
+      volumes:
+        - name: backups
+          {{- if .Values.postgresql.backup.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "vyhub.postgresql.backup.name" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

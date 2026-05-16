@@ -6,7 +6,9 @@ vyhub.key
 
 # setup/ artifacts
 setup/.vyhub.env.cache
+setup/.vyhub.install.json
 setup/.known_hosts
+setup/.local/
 setup/tofu/.terraform/
 setup/tofu/.terraform.lock.hcl
 setup/tofu/terraform.tfstate

@@ -59,9 +59,28 @@ jobs:
       - name: Update chart dependencies
         run: helm dependency update charts/vyhub
 
+      # master: cut a real GitHub release + update the gh-pages chart index.
       - name: Run chart-releaser
+        if: github.ref_name == 'master'
         uses: helm/chart-releaser-action@v1.6.0
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         with:
           skip_existing: true
+
+      # Non-master: package the (vyhub-test) chart and attach it to the
+      # workflow run as a downloadable artifact. No GitHub release is cut,
+      # so feature-branch pushes don't pollute the releases list.
+      - name: Package test chart
+        if: github.ref_name != 'master'
+        run: |
+          mkdir -p .cr-release-packages
+          helm package charts/vyhub --destination .cr-release-packages
+
+      - name: Upload test chart artifact
+        if: github.ref_name != 'master'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vyhub-test-${{ github.ref_name }}
+          path: .cr-release-packages/*.tgz
+          if-no-files-found: error

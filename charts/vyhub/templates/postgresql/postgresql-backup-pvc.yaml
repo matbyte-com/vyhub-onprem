@@ -1,0 +1,17 @@
+{{- if and .Values.postgresql.enabled .Values.postgresql.backup.enabled .Values.postgresql.backup.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "vyhub.postgresql.backup.name" . }}
+  namespace: {{ include "common.names.namespace" . | quote }}
+  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: postgresql-backup
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.postgresql.backup.persistence.size }}
+  {{- if .Values.postgresql.backup.persistence.storageClass }}
+  storageClassName: {{ .Values.postgresql.backup.persistence.storageClass | quote }}
+  {{- end }}
+{{- end }}

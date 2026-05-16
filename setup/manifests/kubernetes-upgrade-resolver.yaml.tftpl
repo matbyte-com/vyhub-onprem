@@ -1,0 +1,107 @@
+# Daily reconciler that keeps the SUC `kubernetes-upgrade` Plan pointed at
+# the latest patch of the cluster's current minor (or one minor higher,
+# clamped to ${k8s_max_minor}). SUC watches Plan.spec.version and rolls a
+# new upgrade Job whenever it changes - so this CronJob is what gives us
+# automatic patch upgrades + automatic stepping once a prior minor upgrade
+# completes, while still respecting the declared minor cap.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubernetes-upgrade-resolver
+  namespace: system-upgrade
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubernetes-upgrade-resolver
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubernetes-upgrade-resolver
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubernetes-upgrade-resolver
+subjects:
+  - kind: ServiceAccount
+    name: kubernetes-upgrade-resolver
+    namespace: system-upgrade
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kubernetes-upgrade-resolver
+  namespace: system-upgrade
+rules:
+  - apiGroups: ["upgrade.cattle.io"]
+    resources: ["plans"]
+    resourceNames: ["kubernetes-upgrade"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kubernetes-upgrade-resolver
+  namespace: system-upgrade
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kubernetes-upgrade-resolver
+subjects:
+  - kind: ServiceAccount
+    name: kubernetes-upgrade-resolver
+    namespace: system-upgrade
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kubernetes-upgrade-resolver
+  namespace: system-upgrade
+spec:
+  schedule: "0 5 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: kubernetes-upgrade-resolver
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: resolver
+              image: alpine/k8s:1.33.0
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+                readOnlyRootFilesystem: true
+              env:
+                - name: MAX_MINOR
+                  value: "${k8s_max_minor}"
+              command: ["/bin/sh", "-eu", "-c"]
+              args:
+                - |
+                  current=$(kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.kubeletVersion}' | sed 's/^v//')
+                  cur_minor=${current%.*}; cur_minor=${cur_minor#*.}
+                  if [ "$cur_minor" -ge "$MAX_MINOR" ]; then
+                    next_minor=$MAX_MINOR
+                  else
+                    next_minor=$((cur_minor + 1))
+                  fi
+                  target=$(curl -fsSL "https://dl.k8s.io/release/stable-1.${next_minor}.txt")
+                  echo "current=v$current cap=1.$MAX_MINOR target=$target"
+                  kubectl -n system-upgrade patch plan kubernetes-upgrade \
+                    --type=merge -p "{\"spec\":{\"version\":\"$target\"}}"

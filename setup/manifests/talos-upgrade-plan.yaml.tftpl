@@ -1,0 +1,90 @@
+# Talos + Kubernetes auto-upgrade plans for Rancher's system-upgrade-controller.
+#
+# setup.sh creates the `talosconfig` Secret in the `system-upgrade` namespace
+# from the tofu-rendered talos_client_configuration output. We mount it into
+# the runner pod and point talosctl at it via the TALOSCONFIG env var.
+#
+# The talosctl image is distroless (no /bin/sh) - we invoke its ENTRYPOINT
+# (/talosctl) directly with k8s downward-API + SUC-provided env vars
+# substituted into args via $(VAR) syntax.
+#
+# Both plans pin a literal `version` computed by setup.sh - one minor above
+# the cluster's current version, clamped to TALOS_MAX_MINOR_VERSION /
+# KUBERNETES_MAX_MINOR_VERSION respectively. talosctl refuses multi-minor
+# jumps, so we step one hop per `setup.sh upgrades` run. The companion
+# resolver CronJobs re-patch `spec.version` daily to the latest patch within
+# the current minor, so patch upgrades roll out without human input.
+apiVersion: upgrade.cattle.io/v1
+kind: Plan
+metadata:
+  name: talos-upgrade
+  namespace: system-upgrade
+spec:
+  serviceAccountName: system-upgrade
+  concurrency: 1
+  exclusive: true
+  nodeSelector:
+    matchExpressions:
+      - { key: node-role.kubernetes.io/control-plane, operator: Exists }
+  version: ${talos_version}
+  secrets:
+    - name: talosconfig
+      path: /var/run/talos
+  upgrade:
+    image: ghcr.io/siderolabs/talosctl:${talosctl_image_tag}
+    envs:
+      - name: NODE_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.hostIP
+      - name: TALOSCONFIG
+        value: /var/run/talos/config
+    args:
+      - --nodes=$(NODE_IP)
+      - upgrade
+      - --image=factory.talos.dev/installer/${talos_schematic_id}:$(SYSTEM_UPGRADE_PLAN_LATEST_VERSION)
+      - --preserve=true
+      - --wait=false
+---
+apiVersion: upgrade.cattle.io/v1
+kind: Plan
+metadata:
+  name: kubernetes-upgrade
+  namespace: system-upgrade
+spec:
+  serviceAccountName: system-upgrade
+  concurrency: 1
+  exclusive: true
+  nodeSelector:
+    matchExpressions:
+      - { key: node-role.kubernetes.io/control-plane, operator: Exists }
+  version: ${kubernetes_version}
+  secrets:
+    - name: talosconfig
+      path: /var/run/talos
+  prepare:
+    image: ghcr.io/siderolabs/talosctl:${talosctl_image_tag}
+    envs:
+      - name: NODE_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.hostIP
+      - name: TALOSCONFIG
+        value: /var/run/talos/config
+    args:
+      - --nodes=$(NODE_IP)
+      - health
+      - --wait-timeout=10m
+  upgrade:
+    image: ghcr.io/siderolabs/talosctl:${talosctl_image_tag}
+    envs:
+      - name: NODE_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.hostIP
+      - name: TALOSCONFIG
+        value: /var/run/talos/config
+    args:
+      - --nodes=$(NODE_IP)
+      - upgrade-k8s
+      - --to=$(SYSTEM_UPGRADE_PLAN_LATEST_VERSION)

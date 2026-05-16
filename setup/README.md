@@ -1,59 +1,75 @@
 # vyhub-onprem one-shot installer
 
-Interactive installer that provisions a Hetzner Cloud VM and brings the
-vyhub-onprem stack up on it. The provisioning is driven by [OpenTofu]
-against the [Hetzner Cloud] provider; the in-VM bootstrap is driven by
-[cloud-init].
+Interactive installer that provisions a Hetzner Cloud VM running
+[Talos Linux] and installs the vyhub Helm chart from `charts.matbyte.com`
+on top. Provisioning is driven by [OpenTofu] against the [Hetzner Cloud]
+provider; the cluster install is driven by `talosctl` + `helm`.
+Talos and Kubernetes auto-update via Rancher's
+[system-upgrade-controller].
 
+[Talos Linux]: https://www.talos.dev
 [OpenTofu]: https://opentofu.org
 [Hetzner Cloud]: https://www.hetzner.com/cloud
-[cloud-init]: https://cloud-init.io
+[system-upgrade-controller]: https://github.com/rancher/system-upgrade-controller
 
 ## What it does
 
-1. Asks for a Hetzner Cloud API token, location, server type and SSH key.
-2. Asks for the VyHub instance env block (the one generated at
-   <https://www.vyhub.net>).
-3. Creates with OpenTofu:
-   - an SSH key resource for each authorized key,
-   - a firewall that only allows TCP 22, 80, 443 (and ICMP),
-   - a Debian 13 server (CAX11 / nbg1 by default) with that firewall.
-4. Cloud-init on the server:
-   - installs Docker (via `get.docker.com`), `git`, `certbot`, `fail2ban`
-     and enables unattended security upgrades,
-   - clones this repo to `/opt/vyhub-onprem`,
-   - runs `first-setup.sh` to generate a baseline `.env` and
-     `docker-compose.override.yml` (with random DB passwords / secrets),
-   - merges your VyHub env vars into `.env` (de-duplicated),
-   - drops a placeholder self-signed cert into `nginx/certs/`,
-   - `docker compose up -d` the stack and writes
-     `/var/lib/vyhub-onprem-ready` when it's done.
-5. Prints the A/AAAA records you need to create.
-6. Optionally runs `certbot` on the server to replace the self-signed cert
-   with a Let's Encrypt cert for `VYHUB_FRONTEND_URL` (and installs a
-   deploy hook so renewals are picked up automatically).
+1. Asks for a Hetzner Cloud API token, location, server type, registry
+   login, the VyHub instance env block (generated at
+   <https://www.vyhub.net>) and an e-mail address for Let's Encrypt.
+2. Creates with OpenTofu:
+   - a firewall allowing TCP 22, 80, 443, 6443 (kube-apiserver) and 50000
+     (talosctl), plus ICMP,
+   - a single Hetzner Cloud server (CAX21 / nbg1 by default) with the
+     public Hetzner Talos ISO attached.
+3. Generates a single-node controlplane Talos machine config (the
+   `siderolabs/talos` provider produces a fresh PKI bundle) and applies
+   it via `talosctl --insecure` while the server is still on the ISO.
+4. Detaches the ISO via the Hetzner API and waits for the disk-installed
+   Talos to come back up.
+5. `talosctl bootstrap`s etcd, fetches the kubeconfig and stashes it in
+   `./.local/kubeconfig`.
+6. **Platform**: installs Traefik (as a hostNetwork DaemonSet bound to the
+   node's :80 / :443) and cert-manager via their official Helm charts,
+   then applies a `letsencrypt` `ClusterIssuer` (HTTP-01 solver against
+   the Traefik ingressClass).
+7. Installs the `system-upgrade-controller`, mounts the rendered
+   `talosconfig` as a Secret, and applies channel-tracked Talos and
+   Kubernetes upgrade `Plan`s. From there on, releases roll out
+   automatically on every reconcile.
+8. Creates a Docker-registry pull secret in the `vyhub` namespace and runs
+   `helm upgrade --install vyhub $VYHUB_CHART_REF` (default:
+   `oci://charts.matbyte.com/vyhub-test/vyhub-test` — the feature-branch
+   build; set `VYHUB_CHART_REF=oci://charts.matbyte.com/vyhub/vyhub` for
+   production, or point at a local `.tgz` artifact) with the captured env
+   vars passed through `app.config.*` and `app.extraEnvVars`. The
+   chart's Ingress is enabled with
+   `ingressClassName: traefik`, host = `VYHUB_FRONTEND_URL`, and the
+   `cert-manager.io/cluster-issuer: letsencrypt` annotation — cert-manager
+   will request a Let's Encrypt cert on first reconcile.
 
 ## Prerequisites
 
 On your laptop:
 
 - [`tofu`](https://opentofu.org/docs/intro/install/) >= 1.6
-- `ssh`, `ssh-keygen`, `curl`, `jq`, `openssl`
-- An SSH keypair (`~/.ssh/id_ed25519` or `~/.ssh/id_rsa`)
+- [`talosctl`](https://www.talos.dev/v1.10/talos-guides/install/talosctl/)
+  matching the Talos version installed (default `v1.10.0`)
+- `kubectl`, `helm` >= 3.12 (OCI support)
+- `curl`, `jq`
 
 In the cloud:
 
 - A [Hetzner account](https://accounts.hetzner.com/signUp).
 - A Hetzner Cloud project: <https://console.hetzner.cloud/projects> →
   **+ New project**.
-- An API token with **Read & Write** permission on that project: open the
-  project, **Security → API Tokens → Generate API Token**. Copy the token
-  immediately - Hetzner only shows it once.
+- An API token with **Read & Write** permission on that project.
 
 From <https://www.vyhub.net>:
 
-- Your instance env block (eight `VYHUB_*` lines). Have it on your
-  clipboard before starting.
+- Your instance env block (eight `VYHUB_*` lines).
+- The `docker login registry.matbyte.com -u … -p …` command from the
+  setup page.
 
 ## Usage
 
@@ -63,84 +79,96 @@ cd setup
 ```
 
 The script is idempotent for the parts that matter. If something blows up
-mid-way you can re-run individual steps:
+mid-way you can re-run individual phases:
 
 ```bash
-./setup.sh apply      # re-run `tofu apply` with the saved tfvars
-./setup.sh outputs    # show server IPs + management cheatsheet
-./setup.sh wait       # block until cloud-init finishes
-./setup.sh ssh        # ssh root@<server>
-./setup.sh ssh "cd /opt/vyhub-onprem && docker compose logs -f"
-./setup.sh certbot    # request / replace the Let's Encrypt cert
-./setup.sh destroy    # delete the Hetzner resources
+./setup.sh apply        # re-run `tofu apply` with the saved tfvars
+./setup.sh bootstrap    # apply Talos config + bootstrap etcd
+./setup.sh platform     # install Traefik + cert-manager + LE ClusterIssuer
+./setup.sh upgrades     # (re)install SUC + auto-update plans
+./setup.sh install      # helm upgrade --install vyhub
+./setup.sh kubeconfig   # write kubeconfig + talosconfig to ./.local
+./setup.sh outputs      # show server IPs + management cheatsheet
+./setup.sh destroy      # delete the Hetzner resources
 ```
 
-State and inputs live under `setup/tofu/`:
+State and inputs live under `setup/`:
 
-- `terraform.tfvars.json` - the answers you gave (chmod 600, gitignored).
-- `terraform.tfstate` - OpenTofu state (chmod 600, gitignored). **Don't
-  delete this file** unless you also `tofu destroy` first, otherwise you
-  will lose track of the resources.
+- `tofu/terraform.tfvars.json` — answers you gave (chmod 600, gitignored).
+- `tofu/terraform.tfstate` — OpenTofu state, including the Talos PKI
+  bundle (chmod 600, gitignored). **Don't delete this file** unless you
+  also `tofu destroy` first.
+- `.vyhub.install.json` — captured registry creds + env vars used by
+  `helm install` (chmod 600, gitignored).
+- `.local/` — rendered `kubeconfig`, `talosconfig`, machine config and
+  Helm values (gitignored).
 
-## DNS step
+## Auto-updates
 
-After `tofu apply` the script prints the IPs and the records you need to
-create. Create both `A` and `AAAA`. The script will not block on DNS - you
-can either wait for propagation now and continue, or skip the cert step
-and re-run `./setup.sh certbot` once the records have spread.
+Two `Plan` resources under the `system-upgrade` namespace drive
+auto-updates (`setup/manifests/talos-upgrade-plan.yaml.tftpl`):
 
-The script uses `dig` (if available) to warn you when DNS still points
-somewhere else.
+- **talos-upgrade** — polls `https://github.com/siderolabs/talos/releases/latest`,
+  runs `talosctl upgrade --image factory.talos.dev/installer/<schematic>:<resolved-version> --preserve`.
+- **kubernetes-upgrade** — polls `https://dl.k8s.io/release/stable.txt`,
+  runs `talosctl upgrade-k8s --to <resolved-version>`, gated by a
+  `talosctl health` prepare step so it waits for in-flight node upgrades.
 
-## TLS / Let's Encrypt
+Both plans mount the cluster's `talosconfig` as a Secret. To pin to a
+specific version (or pause updates) edit `setup/manifests/talos-upgrade-plan.yaml.tftpl`,
+re-run `./setup.sh upgrades`.
 
-The cert step uses `certbot --standalone`, which needs to bind port 80.
-The script briefly stops the `nginx` container, requests the cert, copies
-the resulting fullchain/privkey into `/opt/vyhub-onprem/nginx/certs/` (the
-paths the bundled `nginx/vyhub.conf` reads from), and starts nginx again.
+## DNS / TLS
 
-A renewal deploy hook is installed at
-`/etc/letsencrypt/renewal-hooks/deploy/vyhub-onprem.sh` so future renewals
-(driven by the `certbot.timer` systemd timer) re-copy the cert and
-restart nginx automatically. No cron entry to maintain.
+The `./setup.sh platform` phase brings up the TLS pipeline:
+
+- **Traefik** is the IngressClass (`traefik`) for the cluster. It runs as
+  a `DaemonSet` with `hostNetwork: true` so the node's public :80 / :443
+  go straight to it — no cloud-LB is needed on a single-node setup.
+- **cert-manager** runs in the `cert-manager` namespace with its CRDs
+  installed.
+- A `ClusterIssuer` named `letsencrypt` is applied with an HTTP-01
+  solver targeting the Traefik ingressClass. By default it uses the
+  Let's Encrypt **production** endpoint; the interactive flow offers a
+  staging toggle for testing (no rate limits, untrusted certs).
+
+The vyhub Helm chart's Ingress is rendered with
+`cert-manager.io/cluster-issuer: letsencrypt` and `tls: true`, so on
+first install cert-manager picks up the Ingress, runs the HTTP-01
+challenge against the host (must resolve to the server's IP first), and
+stores the cert as `<host>-tls`. Renewals are handled by cert-manager;
+nothing else to do.
+
+To switch to LE staging after the fact, edit the `ClusterIssuer`:
+`kubectl edit clusterissuer letsencrypt`.
 
 ## Layout
 
 ```
 setup/
-├── README.md                  - this file
-├── setup.sh                   - interactive driver
+├── README.md                                - this file
+├── setup.sh                                 - interactive driver
+├── manifests/
+│   └── talos-upgrade-plan.yaml.tftpl        - Talos / k8s SUC Plans
 └── tofu/
-    ├── versions.tf
+    ├── versions.tf                          - hcloud + siderolabs/talos providers
     ├── variables.tf
-    ├── main.tf                - hcloud_ssh_key, hcloud_firewall, hcloud_server
-    ├── outputs.tf
-    ├── cloud-init.yaml.tftpl  - in-VM bootstrap
+    ├── main.tf                              - firewall, server (ISO), Talos config
+    ├── outputs.tf                           - kubeconfig + talosconfig outputs
     └── .gitignore
 ```
 
 ## Operational notes
 
-- **Re-rendering cloud-init does NOT re-provision the server.** `main.tf`
-  has `lifecycle { ignore_changes = [user_data, ssh_keys] }` to avoid
-  destroying the VM if you tweak the env block. Apply changes by SSH'ing
-  in and editing `/opt/vyhub-onprem/.env` directly, then
-  `docker compose up -d` to pick them up.
+- **The whole flow rebuilds idempotently.** Re-running `./setup.sh`
+  picks up the cached tfvars and re-applies. `bootstrap` skips when
+  etcd is already up; `install` becomes a `helm upgrade`.
 - **Backups.** The script asks whether to enable Hetzner's daily snapshot
-  backups (+20% on the server price). Enable in production - it's the
-  cheapest disaster-recovery option here.
-- **Updating the app.** `ssh` in, `cd /opt/vyhub-onprem`,
-  `git pull && docker compose pull && docker compose up -d`.
-- **Rotating secrets.** `VYHUB_SESSION_SECRET` / `VYHUB_CRYPT_SECRET` /
-  the DB passwords are auto-generated by `first-setup.sh` on the server
-  and never leave it. To rotate, log in and edit `.env` /
-  `docker-compose.override.yml` directly.
-- **Tearing down.** `./setup.sh destroy` removes the server, the
-  firewall and the SSH key resource. Local state in `tofu/` and your
-  Hetzner project itself are kept.
-
-## Architecture caveat
-
-CAX-series servers are ARM64. The bundled `docker-compose.yml` images
-must be available for `linux/arm64` for the default flavor to work; if
-you pick an x86 type (`cpx*`, `cx*`) you'll get amd64 images instead.
+  backups (+20% on the server price). Enable in production - the only
+  PV storage on a single-node Talos cluster is the node disk.
+- **Architecture caveat.** CAX-series servers are ARM64. The bundled
+  chart's images must be available for `linux/arm64`; pick `cpx*` /
+  `cx*` if you need amd64.
+- **Tearing down.** `./setup.sh destroy` removes the server, the firewall
+  and the SSH key resources, and wipes the local `./.local/` directory.
+  Hetzner project itself is kept.

@@ -1,0 +1,14 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "vyhub.postgresql.name" . }}-init
+  namespace: {{ include "common.names.namespace" . | quote }}
+  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+data:
+  10-extensions.sql: |
+    -- VyHub uses uuid_generate_v4() as a default for primary keys;
+    -- the official postgres image does not enable the extension by default.
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+{{- end }}

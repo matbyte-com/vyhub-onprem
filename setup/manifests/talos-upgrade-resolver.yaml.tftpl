@@ -1,0 +1,113 @@
+# Daily reconciler that keeps the SUC `talos-upgrade` Plan pointed at the
+# latest patch of the cluster's current Talos minor (or one minor higher,
+# clamped to ${talos_max_minor}). SUC watches Plan.spec.version and rolls a
+# new upgrade Job whenever it changes - so this CronJob is what gives us
+# automatic patch upgrades + automatic stepping once a prior minor upgrade
+# completes, while still respecting the declared minor cap.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: talos-upgrade-resolver
+  namespace: system-upgrade
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: talos-upgrade-resolver
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: talos-upgrade-resolver
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: talos-upgrade-resolver
+subjects:
+  - kind: ServiceAccount
+    name: talos-upgrade-resolver
+    namespace: system-upgrade
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: talos-upgrade-resolver
+  namespace: system-upgrade
+rules:
+  - apiGroups: ["upgrade.cattle.io"]
+    resources: ["plans"]
+    resourceNames: ["talos-upgrade"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: talos-upgrade-resolver
+  namespace: system-upgrade
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: talos-upgrade-resolver
+subjects:
+  - kind: ServiceAccount
+    name: talos-upgrade-resolver
+    namespace: system-upgrade
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: talos-upgrade-resolver
+  namespace: system-upgrade
+spec:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: talos-upgrade-resolver
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: resolver
+              image: alpine/k8s:1.33.0
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+                readOnlyRootFilesystem: true
+              env:
+                - name: MAX_MINOR
+                  value: "${talos_max_minor}"
+              command: ["/bin/sh", "-eu", "-c"]
+              args:
+                - |
+                  os_image=$(kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.osImage}')
+                  current=$(printf '%s' "$os_image" | sed -n 's/.*v\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')
+                  [ -n "$current" ] || { echo "could not parse Talos version from: $os_image"; exit 1; }
+                  cur_minor=${current%.*}; cur_minor=${cur_minor#*.}
+                  if [ "$cur_minor" -ge "$MAX_MINOR" ]; then
+                    next_minor=$MAX_MINOR
+                  else
+                    next_minor=$((cur_minor + 1))
+                  fi
+                  target=$(curl -fsSL "https://api.github.com/repos/siderolabs/talos/releases?per_page=100" \
+                    | jq -r ".[] | select(.prerelease == false) | .tag_name" \
+                    | grep -E "^v1\.${next_minor}\.[0-9]+$" \
+                    | sort -V | tail -1)
+                  [ -n "$target" ] || { echo "no stable Talos release found for 1.${next_minor}"; exit 1; }
+                  echo "current=v$current cap=1.$MAX_MINOR target=$target"
+                  kubectl -n system-upgrade patch plan talos-upgrade \
+                    --type=merge -p "{\"spec\":{\"version\":\"$target\"}}"

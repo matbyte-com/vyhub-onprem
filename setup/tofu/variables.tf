@@ -5,7 +5,7 @@ variable "hcloud_token" {
 }
 
 variable "server_name" {
-  description = "Name of the Hetzner Cloud server."
+  description = "Name of the Hetzner Cloud server (also used as the Talos cluster name)."
   type        = string
   default     = "vyhub-onprem"
 }
@@ -17,62 +17,45 @@ variable "location" {
 }
 
 variable "server_type" {
-  description = "Hetzner Cloud server type (e.g. cax11, cax21, cpx11, cx22)."
+  description = "Hetzner Cloud server type (e.g. cax21, cpx21, cx22). Talos requires >=2GB RAM and >=2 vCPU; CAX11 is too small for k8s control-plane + workloads."
   type        = string
-  default     = "cax11"
-}
-
-variable "image" {
-  description = "OS image used for the server."
-  type        = string
-  default     = "debian-13"
+  default     = "cax21"
 }
 
 variable "ssh_public_keys" {
-  description = "List of SSH public keys (full key strings) authorized for root access."
+  description = "List of SSH public keys (full key strings) authorized for the Hetzner web console rescue path. Talos itself has no SSH, but Hetzner attaches these keys to the server resource for completeness."
   type        = list(string)
-  validation {
-    condition     = length(var.ssh_public_keys) > 0
-    error_message = "At least one SSH public key must be provided."
-  }
+  default     = []
 }
 
-variable "vyhub_env" {
-  description = "Map of VYHUB_* env vars (and optional VYHUB_AUTH_STEAM_KEY) written to /opt/vyhub-onprem/.env on the server."
-  type        = map(string)
-  sensitive   = true
-}
-
-variable "repo_url" {
-  description = "Git URL of the vyhub-onprem repo to clone on the server."
+variable "talos_iso_name" {
+  description = "Name of the Hetzner public Talos ISO (amd64). Hetzner ships these under the `hcloud-vX-Y-Z.{amd64,arm64}.iso` naming convention with schematic id ce4c980550dd2ab1b17bbf2b08801c7eb59418eafe8f279833297925d67c7515 (Hetzner + qemu-guest-agent)."
   type        = string
-  default     = "https://github.com/matbyte-com/vyhub-onprem.git"
+  default     = "hcloud-v1-12-4.amd64.iso"
 }
 
-variable "repo_ref" {
-  description = "Git ref (branch/tag/commit) of the vyhub-onprem repo to check out."
+variable "talos_iso_name_arm" {
+  description = "Name of the Hetzner public Talos ISO for ARM (CAX) server types."
   type        = string
-  default     = "master"
+  default     = "hcloud-v1-12-4.arm64.iso"
 }
 
-variable "registry_url" {
-  description = "Container registry URL to authenticate against before pulling images (e.g. registry.matbyte.com)."
+variable "talos_version" {
+  description = "Talos version to install/upgrade to. Must match the ISO version."
   type        = string
-  default     = ""
+  default     = "v1.12.4"
 }
 
-variable "registry_user" {
-  description = "Username for the container registry."
+variable "talos_schematic_id" {
+  description = "Talos image factory schematic id for the installer image (Hetzner + qemu-guest-agent)."
   type        = string
-  sensitive   = true
-  default     = ""
+  default     = "ce4c980550dd2ab1b17bbf2b08801c7eb59418eafe8f279833297925d67c7515"
 }
 
-variable "registry_password" {
-  description = "Password / token for the container registry."
+variable "kubernetes_version" {
+  description = "Kubernetes version to bootstrap (used by Talos)."
   type        = string
-  sensitive   = true
-  default     = ""
+  default     = "1.33.0"
 }
 
 variable "enable_backups" {
@@ -87,4 +70,10 @@ variable "labels" {
   default = {
     managed-by = "vyhub-onprem-setup"
   }
+}
+
+variable "admin_cidrs" {
+  description = "CIDRs allowed to reach the Talos (50000) and Kubernetes (6443) APIs. Default is wide-open so the initial apply (before the cluster exists) succeeds; `setup.sh firewall` narrows it to the operator's current public IP."
+  type        = list(string)
+  default     = ["0.0.0.0/0", "::/0"]
 }
