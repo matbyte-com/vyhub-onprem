@@ -5,7 +5,6 @@ vyhub.crt
 vyhub.key
 
 # setup/ artifacts
-setup/.vyhub.env.cache
 setup/.known_hosts
 setup/tofu/.terraform/
 setup/tofu/.terraform.lock.hcl

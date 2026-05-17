@@ -1,6 +1,6 @@
 services:
   app:
-    image: registry.matbyte.com/vyhub/vyhub-onprem:latest
+    image: registry.matbyte.com/vyhub/vyhub-onprem:3.3.0
     depends_on:
       - db
       - geoip-api
@@ -12,6 +12,15 @@ services:
       - ./web:/opt/vyhub/web
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    labels:
+      autoheal: "true"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket,sys; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 5050)); s.close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
   db:
     image: postgres:17
     # ports:
@@ -23,17 +32,29 @@ services:
     volumes:
       - vyhub-db:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    labels:
+      autoheal: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d vyhub"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
   geoip-api:
     image: observabilitystack/geoip-api:latest
+    restart: unless-stopped
   pdf-api:
     image: ghcr.io/matbyte-com/htmltopdf-api:1.1.0
     stop_signal: SIGKILL
+    restart: unless-stopped
   loki:
     image: grafana/loki:2.8.0
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - ./loki/loki-config.yaml:/etc/loki/local-config.yaml
       - vyhub-loki:/loki
+    restart: unless-stopped
   nginx:
     image: nginx:1
     volumes:
@@ -45,6 +66,17 @@ services:
       - "443:443"
     depends_on:
       - app
+    restart: unless-stopped
+    labels:
+      autoheal: "true"
+    healthcheck:
+      # nginx:1 (debian-slim) has no curl/wget/nc, so check the master
+      # process directly via /proc — PID 1 is the nginx master.
+      test: ["CMD-SHELL", "grep -q nginx /proc/1/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
   db-backup:
     image: prodrigestivill/postgres-backup-local:17
     restart: unless-stopped
@@ -63,6 +95,22 @@ services:
       BACKUP_KEEP_MONTHS: 6
       POSTGRES_EXTRA_OPTS: "--no-owner --no-acl"
       HEALTHCHECK_PORT: 8080
+    labels:
+      autoheal: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --spider http://127.0.0.1:8080/ || exit 1"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+  autoheal:
+    image: willfarrell/autoheal:latest
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: 30
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 volumes:
   vyhub-db:
   vyhub-loki:

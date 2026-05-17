@@ -1,6 +1,7 @@
 services:
   app:
-    image: registry.matbyte.com/vyhub/vyhub-onprem:3.3.0
+    # Optionally, set a fixed image to use a specific version of VyHub.
+    # image: registry.matbyte.com/vyhub/vyhub-onprem:3.3.0
   db:
     environment:
       POSTGRES_PASSWORD: GEN_DB_SU_PW # superuser password

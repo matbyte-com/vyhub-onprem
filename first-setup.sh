@@ -1,12 +1,14 @@
 #!/bin/bash
 
-# Exit if .env or docker-compose.override.yml already exist
+# Bail if EITHER file exists. The secrets baked into both files must be
+# generated together — if one exists the other must be deleted before
+# re-running, or you'd end up with mismatched DB passwords.
 if [ -f .env ] || [ -f docker-compose.override.yml ]; then
     echo "Setup has already been run. If you want to run it again, delete the files .env and docker-compose.override.yml and run this script again."
     exit 1
 fi
 
-mkdir web
+mkdir -p web
 chown 1000:1000 web
 
 cp -n .env.template .env

@@ -1,9 +1,14 @@
-# vyhub-onprem one-shot installer
+# vyhub-onprem installer
 
-Interactive installer that provisions a Hetzner Cloud VM and brings the
-vyhub-onprem stack up on it. The provisioning is driven by [OpenTofu]
-against the [Hetzner Cloud] provider; the in-VM bootstrap is driven by
-[cloud-init].
+Two entry points, sharing the same server-side installer (`install.sh`):
+
+- **`setup.sh`** (this directory) — laptop-side driver that provisions a
+  fresh Hetzner Cloud VM with [OpenTofu], then hands off to `install.sh`
+  on the VM via [cloud-init].
+- **`install.sh`** — server-side installer. Runs on any Debian/Ubuntu
+  host (fresh cloud-init VM or an existing server you already manage).
+  Installs Docker + dependencies, generates secrets, merges the VyHub env
+  block, and brings the `docker compose` stack up.
 
 [OpenTofu]: https://opentofu.org
 [Hetzner Cloud]: https://www.hetzner.com/cloud
@@ -11,27 +16,32 @@ against the [Hetzner Cloud] provider; the in-VM bootstrap is driven by
 
 ## What it does
 
-1. Asks for a Hetzner Cloud API token, location, server type and SSH key.
-2. Asks for the VyHub instance env block (the one generated at
+1. `setup.sh` asks for a Hetzner Cloud API token, location, server type
+   and SSH key.
+2. `setup.sh` asks for the VyHub instance env block (generated at
    <https://www.vyhub.net>).
-3. Creates with OpenTofu:
+3. OpenTofu creates:
    - an SSH key resource for each authorized key,
    - a firewall that only allows TCP 22, 80, 443 (and ICMP),
    - a Debian 13 server (CAX11 / nbg1 by default) with that firewall.
-4. Cloud-init on the server:
-   - installs Docker (via `get.docker.com`), `git`, `certbot`, `fail2ban`
-     and enables unattended security upgrades,
-   - clones this repo to `/opt/vyhub-onprem`,
+4. Cloud-init on the server writes `/etc/vyhub-onprem.env` (and
+   `/etc/vyhub-registry.env` if a registry login was provided), clones
+   this repo to `/opt/vyhub-onprem`, and runs
+   `setup/install.sh install --non-interactive`. The installer:
+   - installs Docker (via `get.docker.com`), `git`, `certbot`, `fail2ban`,
+     `jq`, `openssl`, and enables unattended security upgrades,
    - runs `first-setup.sh` to generate a baseline `.env` and
      `docker-compose.override.yml` (with random DB passwords / secrets),
    - merges your VyHub env vars into `.env` (de-duplicated),
    - drops a placeholder self-signed cert into `nginx/certs/`,
+   - logs in to the container registry (if creds were provided),
    - `docker compose up -d` the stack and writes
      `/var/lib/vyhub-onprem-ready` when it's done.
-5. Prints the A/AAAA records you need to create.
-6. Optionally runs `certbot` on the server to replace the self-signed cert
-   with a Let's Encrypt cert for `VYHUB_FRONTEND_URL` (and installs a
-   deploy hook so renewals are picked up automatically).
+5. `setup.sh` prints the A/AAAA records you need to create.
+6. Optionally `setup.sh` runs `install.sh certbot ...` on the server to
+   replace the self-signed cert with a Let's Encrypt cert for
+   `VYHUB_FRONTEND_URL` (and installs a deploy hook so renewals are
+   picked up automatically).
 
 ## Prerequisites
 
@@ -55,7 +65,7 @@ From <https://www.vyhub.net>:
 - Your instance env block (eight `VYHUB_*` lines). Have it on your
   clipboard before starting.
 
-## Usage
+## Usage — provision a new Hetzner VM
 
 ```bash
 cd setup
@@ -73,6 +83,36 @@ mid-way you can re-run individual steps:
 ./setup.sh ssh "cd /opt/vyhub-onprem && docker compose logs -f"
 ./setup.sh certbot    # request / replace the Let's Encrypt cert
 ./setup.sh destroy    # delete the Hetzner resources
+```
+
+## Usage — install on an existing Debian server
+
+If you already have a Debian/Ubuntu host (root access required), skip
+OpenTofu entirely and run `install.sh` directly:
+
+```bash
+git clone https://github.com/matbyte-com/vyhub-onprem.git /opt/vyhub-onprem
+cd /opt/vyhub-onprem
+sudo ./setup/install.sh
+```
+
+You will be prompted for the VyHub env block (from the Setup dialog at
+<https://www.vyhub.net>) and the optional container registry login.
+
+Once DNS for `VYHUB_FRONTEND_URL` resolves to the server, request a
+Let's Encrypt certificate:
+
+```bash
+sudo ./setup/install.sh certbot --email you@example.com
+```
+
+Non-interactive use (e.g. driven by your own automation) is supported by
+pre-populating `/etc/vyhub-onprem.env` (and optionally
+`/etc/vyhub-registry.env` with three lines: URL, user, password) and
+running:
+
+```bash
+sudo ./setup/install.sh install --non-interactive
 ```
 
 State and inputs live under `setup/tofu/`:
@@ -109,14 +149,57 @@ restart nginx automatically. No cron entry to maintain.
 ```
 setup/
 ├── README.md                  - this file
-├── setup.sh                   - interactive driver
+├── setup.sh                   - laptop-side driver (OpenTofu + Hetzner)
+├── install.sh                 - server-side installer (Debian/Ubuntu)
 └── tofu/
     ├── versions.tf
     ├── variables.tf
     ├── main.tf                - hcloud_ssh_key, hcloud_firewall, hcloud_server
     ├── outputs.tf
-    ├── cloud-init.yaml.tftpl  - in-VM bootstrap
+    ├── cloud-init.yaml.tftpl  - writes env files + invokes install.sh
     └── .gitignore
+```
+
+## Maintenance — nightly auto-updates
+
+`install.sh` installs a systemd timer that keeps the stack current with no
+manual maintenance:
+
+| Timer                              | Fires (local time) | Action                                                                 |
+| ---------------------------------- | ------------------ | ---------------------------------------------------------------------- |
+| `apt-daily-upgrade.timer`*         | ~01:00 ± 30 min    | `unattended-upgrades` installs Debian + Docker apt updates             |
+| (auto-reboot)*                     | 02:00              | reboot if a kernel update required it                                  |
+| `vyhub-onprem-update.timer`        | ~03:30 ± 30 min    | `git pull --ff-only && docker compose pull && docker compose up -d`    |
+
+\* Configured only on Hetzner / cloud-init servers. On a manually
+installed Debian host, only the container update timer is set up — the
+server's existing apt policy is left untouched.
+
+Inspect / control on the server:
+
+```bash
+systemctl list-timers --all | grep -E 'vyhub|apt-daily'
+journalctl -u vyhub-onprem-update.service  # container update logs
+journalctl -u unattended-upgrades.service  # OS upgrade logs
+sudo /opt/vyhub-onprem/setup/install.sh update   # run a container update on demand
+```
+
+### Disk-fill safeguards
+
+`install.sh` writes `/etc/docker/daemon.json` with a `10m × 3` json-file
+log cap (skipped if the file already exists). Old Docker images are
+pruned on every nightly update.
+
+### Self-healing
+
+`docker-compose.yml` runs a `willfarrell/autoheal` sidecar that restarts
+any container reporting `unhealthy`. The `app`, `db`, `nginx`, and
+`db-backup` services have healthchecks; if one hangs, autoheal restarts
+it within ~30 s without operator intervention. Inspect with:
+
+```bash
+docker compose ps               # STATUS column shows (healthy)/(unhealthy)
+docker compose logs autoheal
 ```
 
 ## Operational notes
@@ -129,8 +212,9 @@ setup/
 - **Backups.** The script asks whether to enable Hetzner's daily snapshot
   backups (+20% on the server price). Enable in production - it's the
   cheapest disaster-recovery option here.
-- **Updating the app.** `ssh` in, `cd /opt/vyhub-onprem`,
-  `git pull && docker compose pull && docker compose up -d`.
+- **Updating the app.** Happens automatically nightly (see above). To
+  trigger a manual update: ssh in and run
+  `sudo /opt/vyhub-onprem/setup/install.sh update`.
 - **Rotating secrets.** `VYHUB_SESSION_SECRET` / `VYHUB_CRYPT_SECRET` /
   the DB passwords are auto-generated by `first-setup.sh` on the server
   and never leave it. To rotate, log in and edit `.env` /
