@@ -29,6 +29,7 @@ services:
       POSTGRES_USER: postgres # superuser
       POSTGRES_DB: vyhub
       POSTGRES_VYHUB_USER: vyhub
+      POSTGRES_VYHUB_PASSWORD: ${VYHUB_DB_PASSWORD} # password for the vyhub user
     volumes:
       - vyhub-db:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d
@@ -44,10 +45,26 @@ services:
   geoip-api:
     image: observabilitystack/geoip-api:latest
     restart: unless-stopped
+    labels:
+      autoheal: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/8.8.8.8 >/dev/null 2>&1 || curl -fsS http://127.0.0.1:8080/8.8.8.8 >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
   pdf-api:
     image: ghcr.io/matbyte-com/htmltopdf-api:1.1.0
     stop_signal: SIGKILL
     restart: unless-stopped
+    labels:
+      autoheal: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/healthz >/dev/null 2>&1 || curl -fsS http://127.0.0.1:9090/healthz >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
   loki:
     image: grafana/loki:2.8.0
     command: -config.file=/etc/loki/local-config.yaml
@@ -55,6 +72,14 @@ services:
       - ./loki/loki-config.yaml:/etc/loki/local-config.yaml
       - vyhub-loki:/loki
     restart: unless-stopped
+    labels:
+      autoheal: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3100/ready >/dev/null 2>&1 || curl -fsS http://127.0.0.1:3100/ready >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
   nginx:
     image: nginx:1
     volumes:

@@ -5,7 +5,6 @@ services:
   db:
     environment:
       POSTGRES_PASSWORD: GEN_DB_SU_PW # superuser password
-      POSTGRES_VYHUB_PASSWORD: GEN_DB_PW # password for the vyhub user
     # Uncomment to make the database available on the host system at localhost port 15432.
     # Beware to set correct firewall rules to prevent access from the internet.
     # ports:
