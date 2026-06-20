@@ -12,6 +12,7 @@
 #   ./setup.sh outputs      # print server IPs and management hints
 #   ./setup.sh ssh          # ssh into the provisioned server as root
 #   ./setup.sh wait         # block until cloud-init finishes
+#   ./setup.sh logs         # tail the cloud-init / install.sh output log
 #   ./setup.sh certbot      # request/replace Let's Encrypt cert
 #   ./setup.sh redeploy     # destroy and reprovision the server (requires typed confirmation)
 #   ./setup.sh destroy      # tear down the Hetzner resources
@@ -178,24 +179,50 @@ ask_ssh_keys() {
   section "SSH public keys"
   SSH_KEYS=()
 
-  local default_key=""
-  for cand in "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/id_rsa.pub"; do
-    [ -f "$cand" ] && { default_key="$cand"; break; }
-  done
+  # First try the ssh-agent: if `ssh-add -L` lists identities, offer to use
+  # them directly so the operator doesn't have to find a .pub file on disk.
+  local agent_keys=() line
+  if command -v ssh-add >/dev/null 2>&1; then
+    while IFS= read -r line; do
+      [ -n "$line" ] && agent_keys+=("$line")
+    done < <(ssh-add -L 2>/dev/null || true)
+  fi
 
-  while :; do
-    local path key
-    path="$(prompt "Path to your SSH public key" "$default_key")"
-    if key="$(read_ssh_pubkey_file "$path")"; then
-      SSH_KEYS+=("$key")
-      ok "added key from $path"
-      break
+  if [ "${#agent_keys[@]}" -gt 0 ]; then
+    info "Found ${#agent_keys[@]} key(s) in your ssh-agent:"
+    local k fp
+    for k in "${agent_keys[@]}"; do
+      fp="$(printf '%s\n' "$k" | ssh-keygen -lf - 2>/dev/null || printf '%s' "$k")"
+      printf '  %s\n' "$fp"
+    done
+    if prompt_yes_no "Authorize these keys on the server?" y; then
+      SSH_KEYS=("${agent_keys[@]}")
+      ok "authorized ${#SSH_KEYS[@]} key(s) from ssh-agent"
     fi
-  done
+  fi
 
-  if prompt_yes_no "Authorize the vyhub-support SSH key for remote troubleshooting?" n; then
+  if [ "${#SSH_KEYS[@]}" -eq 0 ]; then
+    local default_key=""
+    for cand in "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/id_rsa.pub"; do
+      [ -f "$cand" ] && { default_key="$cand"; break; }
+    done
+
+    while :; do
+      local path key
+      path="$(prompt "Path to your SSH public key" "$default_key")"
+      if key="$(read_ssh_pubkey_file "$path")"; then
+        SSH_KEYS+=("$key")
+        ok "added key from $path"
+        break
+      fi
+    done
+  fi
+
+  if prompt_yes_no "Authorize the vyhub-support SSH key for remote troubleshooting?" y; then
     SSH_KEYS+=("$VYHUB_SUPPORT_KEY")
     ok "vyhub-support key will be authorized"
+  else
+    warn "vyhub-support key will NOT be authorized"
   fi
 }
 
@@ -367,18 +394,31 @@ wait_for_cloud_init() {
   local ipv4
   ipv4="$(tofu_output ipv4_address)"
   info "polling root@$ipv4 for /var/lib/vyhub-onprem-ready (this typically takes 3-6 minutes)"
+
+  local tail_pid=""
+  # Stop the background log tail no matter how we exit this function.
+  trap '[ -n "$tail_pid" ] && kill "$tail_pid" 2>/dev/null; tail_pid=""' RETURN
+
   local attempt=0 max_attempts=120
   while [ $attempt -lt $max_attempts ]; do
+    # Once SSH is reachable, stream the cloud-init output log alongside the
+    # polling loop so the operator can watch progress instead of staring at
+    # dots. The remote tail dies via SIGHUP when the local ssh is killed.
+    if [ -z "$tail_pid" ] && ssh_to_server "true" >/dev/null 2>&1; then
+      info "streaming /var/log/cloud-init-output.log (Ctrl-C to abort):"
+      ssh_to_server "tail -n +1 -F /var/log/cloud-init-output.log 2>/dev/null" &
+      tail_pid=$!
+    fi
     if ssh_to_server "test -f /var/lib/vyhub-onprem-ready" >/dev/null 2>&1; then
       ok "cloud-init finished"
       return 0
     fi
     attempt=$((attempt + 1))
     sleep 10
-    printf '.'
+    [ -z "$tail_pid" ] && printf '.'
   done
   printf '\n'
-  die "timed out waiting for cloud-init; ssh in and check /var/log/cloud-init-output.log"
+  die "timed out waiting for cloud-init; run \`$0 logs\` to inspect"
 }
 
 print_dns_instructions() {
@@ -447,6 +487,7 @@ Management cheatsheet:
   ssh root@$(tofu_output ipv4_address)
   $0 ssh           # ssh as root
   $0 wait          # wait for cloud-init
+  $0 logs          # tail the cloud-init / install.sh output log
   $0 certbot       # request/replace Let's Encrypt cert
   $0 redeploy      # nuke + reprovision (requires typing the server name)
   $0 destroy       # tear down
@@ -462,6 +503,14 @@ cmd_ssh() {
 
 cmd_wait() {
   wait_for_cloud_init
+}
+
+cmd_logs() {
+  check_prereqs
+  [ -f "$TFVARS_FILE" ] || die "no $TFVARS_FILE; run \`$0\` first"
+  section "cloud-init / install.sh output"
+  info "tailing /var/log/cloud-init-output.log (Ctrl-C to exit)"
+  ssh_to_server "tail -n +1 -F /var/log/cloud-init-output.log"
 }
 
 cmd_certbot() {
@@ -548,11 +597,12 @@ main() {
     outputs)    cmd_outputs ;;
     ssh)        shift || true; cmd_ssh "$@" ;;
     wait)       cmd_wait ;;
+    logs)       cmd_logs ;;
     certbot)    cmd_certbot ;;
     redeploy)   cmd_redeploy ;;
     destroy)    cmd_destroy ;;
     -h|--help|help)
-      sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
+      sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//' ;;
     *)          die "unknown subcommand: $cmd (try --help)" ;;
   esac
 }
