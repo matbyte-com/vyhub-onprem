@@ -1,14 +1,18 @@
 # vyhub-onprem installer
 
-Two entry points, sharing the same server-side installer (`install.sh`):
+Two installation methods, sharing the same server-side installer
+(`install.sh`):
 
-- **`setup.sh`** (this directory) — laptop-side driver that provisions a
-  fresh Hetzner Cloud VM with [OpenTofu], then hands off to `install.sh`
-  on the VM via [cloud-init].
-- **`install.sh`** — server-side installer. Runs on any Debian/Ubuntu
-  host (fresh cloud-init VM or an existing server you already manage).
-  Installs Docker + dependencies, generates secrets, merges the VyHub env
-  block, and brings the `docker compose` stack up.
+- **Method 1 — provision a new Hetzner VM (`setup.sh`).** Laptop-side
+  driver that provisions a fresh Hetzner Cloud VM with [OpenTofu], then
+  hands off to `install.sh` on the VM via [cloud-init]. Use this when you
+  don't have a server yet. → [Usage](#usage--provision-a-new-hetzner-vm)
+- **Method 2 — install on an existing server (`install.sh`).**
+  Server-side installer. Runs on any Debian/Ubuntu host you already
+  manage. Installs Docker + dependencies, generates secrets, merges the
+  VyHub env block, and brings the `docker compose` stack up. Supports a
+  `--non-interactive` mode for your own automation.
+  → [Usage](#usage--install-on-an-existing-debian-server)
 
 [OpenTofu]: https://opentofu.org
 [Hetzner Cloud]: https://www.hetzner.com/cloud
@@ -21,7 +25,8 @@ Two entry points, sharing the same server-side installer (`install.sh`):
 2. `setup.sh` asks for the VyHub instance env block (generated at
    <https://www.vyhub.net>).
 3. OpenTofu creates:
-   - an SSH key resource for each authorized key,
+   - an SSH key resource for each authorized key (existing keys already in
+     the Hetzner project are detected and reused instead of re-uploaded),
    - a firewall that only allows TCP 22, 80, 443 (and ICMP),
    - a Debian 13 server (CAX11 / nbg1 by default) with that firewall.
 4. Cloud-init on the server writes `/etc/vyhub-onprem.env` (and
@@ -49,7 +54,9 @@ On your laptop:
 
 - [`tofu`](https://opentofu.org/docs/intro/install/) >= 1.6
 - `ssh`, `ssh-keygen`, `curl`, `jq`, `openssl`
-- An SSH keypair (`~/.ssh/id_ed25519` or `~/.ssh/id_rsa`)
+- An SSH keypair (`~/.ssh/id_ed25519` or `~/.ssh/id_rsa`). Keys already
+  loaded into your `ssh-agent` (`ssh-add -L`) are auto-detected and
+  offered; otherwise you'll be prompted for a `.pub` file path.
 
 In the cloud:
 
@@ -78,10 +85,12 @@ mid-way you can re-run individual steps:
 ```bash
 ./setup.sh apply      # re-run `tofu apply` with the saved tfvars
 ./setup.sh outputs    # show server IPs + management cheatsheet
-./setup.sh wait       # block until cloud-init finishes
+./setup.sh wait       # block until cloud-init finishes (streams the log)
+./setup.sh logs       # tail the cloud-init / install.sh output log
 ./setup.sh ssh        # ssh root@<server>
 ./setup.sh ssh "cd /opt/vyhub-onprem && docker compose logs -f"
 ./setup.sh certbot    # request / replace the Let's Encrypt cert
+./setup.sh redeploy   # destroy + reprovision from scratch (typed confirm)
 ./setup.sh destroy    # delete the Hetzner resources
 ```
 
@@ -154,7 +163,7 @@ setup/
 └── tofu/
     ├── versions.tf
     ├── variables.tf
-    ├── main.tf                - hcloud_ssh_key, hcloud_firewall, hcloud_server
+    ├── main.tf                - hcloud_ssh_key(s), hcloud_firewall, hcloud_server
     ├── outputs.tf
     ├── cloud-init.yaml.tftpl  - writes env files + invokes install.sh
     └── .gitignore
@@ -193,9 +202,10 @@ pruned on every nightly update.
 ### Self-healing
 
 `docker-compose.yml` runs a `willfarrell/autoheal` sidecar that restarts
-any container reporting `unhealthy`. The `app`, `db`, `nginx`, and
-`db-backup` services have healthchecks; if one hangs, autoheal restarts
-it within ~30 s without operator intervention. Inspect with:
+any container reporting `unhealthy`. Every application service — `app`,
+`db`, `nginx`, `db-backup`, `geoip-api`, `pdf-api`, and `loki` — has a
+healthcheck and the `autoheal` label; if one hangs, autoheal restarts it
+within ~30 s without operator intervention. Inspect with:
 
 ```bash
 docker compose ps               # STATUS column shows (healthy)/(unhealthy)
@@ -223,8 +233,3 @@ docker compose logs autoheal
   firewall and the SSH key resource. Local state in `tofu/` and your
   Hetzner project itself are kept.
 
-## Architecture caveat
-
-CAX-series servers are ARM64. The bundled `docker-compose.yml` images
-must be available for `linux/arm64` for the default flavor to work; if
-you pick an x86 type (`cpx*`, `cx*`) you'll get amd64 images instead.

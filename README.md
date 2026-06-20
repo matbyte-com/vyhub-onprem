@@ -2,17 +2,23 @@
 
 This is the on-prem version of VyHub. (Also known as "Selfhosting")
 
-## Setup
+## Installation methods
 
-Follow the instructions at [the docs](https://docs.vyhub.net/latest/getting_started/selfhosting/#installing).
+Pick whichever matches what you already have. The first two are automated
+by the scripts in [`setup/`](setup/README.md) — see
+[`setup/README.md`](setup/README.md) for the full walkthrough.
 
-### One-shot install on Hetzner Cloud
+| Method | Use when | How |
+|--------|----------|-----|
+| **1. One-shot on Hetzner Cloud** | You have no server yet and want everything provisioned for you. | Run `cd setup && ./setup.sh` on your laptop. [OpenTofu] spins up a Debian 13 + Docker VM, clones this repo to it, applies your `VYHUB_*` env block, and optionally requests a Let's Encrypt cert. |
+| **2. Existing Debian/Ubuntu server** | You already manage a host (any provider, or bare metal). | `git clone` this repo to the server and run `sudo ./setup/install.sh`. Installs Docker + dependencies, generates secrets, and brings the stack up. Supports a `--non-interactive` mode for your own automation. |
+| **3. Fully manual** | You want to wire up `docker compose` yourself. | Follow the [docs](https://docs.vyhub.net/latest/getting_started/selfhosting/#installing). |
 
-If you don't already have a host, the [`setup/`](setup/README.md) directory
-contains an interactive OpenTofu-driven installer that provisions a
-Hetzner Cloud VM (Debian 13 + Docker), clones this repo onto it, applies
-your `VYHUB_*` env block and optionally requests a Let's Encrypt cert.
-See [`setup/README.md`](setup/README.md).
+Methods 1 and 2 share the same server-side installer (`install.sh`) and
+both set up nightly auto-updates, self-healing healthchecks, and daily DB
+backups out of the box.
+
+[OpenTofu]: https://opentofu.org
 
 ## Database backups
 
