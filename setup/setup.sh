@@ -353,7 +353,7 @@ wait_for_cloud_init() {
 
   local tail_pid=""
   # Stop the background log tail no matter how we exit this function.
-  trap '[ -n "$tail_pid" ] && kill "$tail_pid" 2>/dev/null; tail_pid=""' RETURN
+  trap '[ -n "${tail_pid:-}" ] && kill "$tail_pid" 2>/dev/null; tail_pid=""' RETURN
 
   local attempt=0 max_attempts=120
   while [ $attempt -lt $max_attempts ]; do
@@ -506,12 +506,20 @@ cmd_redeploy() {
   rm -f "$SCRIPT_DIR/.known_hosts"
   ( cd "$TOFU_DIR" && tofu apply -auto-approve )
 
-  if prompt_yes_no "Wait for cloud-init to finish?" y; then
-    wait_for_cloud_init
-  fi
-
   ok "server redeployed"
   cmd_outputs
+  print_dns_instructions
+
+  if prompt_yes_no "Wait for cloud-init to finish?" y; then
+    wait_for_cloud_init
+    print_dns_instructions
+
+    if prompt_yes_no "Provision a Let's Encrypt certificate now? (DNS must already point to the server)" y; then
+      run_certbot
+    else
+      say "You can run \`$0 certbot\` later once DNS has propagated."
+    fi
+  fi
 }
 
 cmd_full() {
@@ -530,10 +538,13 @@ cmd_full() {
 
   if prompt_yes_no "Wait for cloud-init to finish now?" y; then
     wait_for_cloud_init
-  fi
+    print_dns_instructions
 
-  if prompt_yes_no "Provision a Let's Encrypt certificate now? (DNS must already point to the server)" y; then
-    run_certbot
+    if prompt_yes_no "Provision a Let's Encrypt certificate now? (DNS must already point to the server)" y; then
+      run_certbot
+    else
+      say "You can run \`$0 certbot\` later once DNS has propagated."
+    fi
   else
     say "You can run \`$0 certbot\` later once DNS has propagated."
   fi
