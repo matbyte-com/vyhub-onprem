@@ -22,15 +22,18 @@ Two installation methods, sharing the same server-side installer
 
 1. `setup.sh` asks for a Hetzner Cloud API token, location, server type
    and SSH key.
-2. `setup.sh` asks for the VyHub instance env block (generated at
-   <https://www.vyhub.net>).
+2. `setup.sh` asks for a single VyHub config string. Generate it at
+   <https://www.vyhub.net> → Setup dialog → **Automated (Hetzner Cloud)**
+   and paste it on one line — it contains both the VyHub `VYHUB_*` env
+   vars and the container registry credentials, encoded as
+   base64-of-JSON, so no further parsing is needed.
 3. OpenTofu creates:
    - an SSH key resource for each authorized key (existing keys already in
      the Hetzner project are detected and reused instead of re-uploaded),
    - a firewall that only allows TCP 22, 80, 443 (and ICMP),
    - a Debian 13 server (CAX11 / nbg1 by default) with that firewall.
-4. Cloud-init on the server writes `/etc/vyhub-onprem.env` (and
-   `/etc/vyhub-registry.env` if a registry login was provided), clones
+4. Cloud-init on the server writes `/etc/vyhub-onprem-config.json` (a single
+   JSON object holding the `env` vars and `registry` credentials), clones
    this repo to `/opt/vyhub-onprem`, and runs
    `setup/install.sh install --non-interactive`. The installer:
    - installs Docker (via `get.docker.com`), `git`, `certbot`, `fail2ban`,
@@ -69,8 +72,9 @@ In the cloud:
 
 From <https://www.vyhub.net>:
 
-- Your instance env block (eight `VYHUB_*` lines). Have it on your
-  clipboard before starting.
+- Your instance config string (open the Setup dialog on your instance,
+  choose **Automated (Hetzner Cloud)** and copy the single string shown
+  there). Have it on your clipboard before starting.
 
 ## Usage — provision a new Hetzner VM
 
@@ -105,8 +109,10 @@ cd /opt/vyhub-onprem
 sudo ./setup/install.sh
 ```
 
-You will be prompted for the VyHub env block (from the Setup dialog at
-<https://www.vyhub.net>) and the optional container registry login.
+You will be prompted to paste the single config string from the Setup
+dialog at <https://www.vyhub.net> (the same base64 string `setup.sh`
+consumes). It carries both the `VYHUB_*` env vars and the container
+registry login.
 
 Once DNS for `VYHUB_FRONTEND_URL` resolves to the server, request a
 Let's Encrypt certificate:
@@ -116,9 +122,9 @@ sudo ./setup/install.sh certbot --email you@example.com
 ```
 
 Non-interactive use (e.g. driven by your own automation) is supported by
-pre-populating `/etc/vyhub-onprem.env` (and optionally
-`/etc/vyhub-registry.env` with three lines: URL, user, password) and
-running:
+pre-populating `/etc/vyhub-onprem-config.json` with a JSON object of the
+form `{"env": {"VYHUB_*": "..."}, "registry": {"url": "...", "username":
+"...", "password": "..."}}` and running:
 
 ```bash
 sudo ./setup/install.sh install --non-interactive

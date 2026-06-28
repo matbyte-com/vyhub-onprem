@@ -20,43 +20,6 @@ backups out of the box.
 
 [OpenTofu]: https://opentofu.org
 
-## Database backups
-
-The `db-backup` service uses
-[`prodrigestivill/postgres-backup-local`](https://github.com/prodrigestivill/docker-postgres-backup-local)
-to take a daily `pg_dump` of the `vyhub` database and store it compressed
-in the `vyhub-db-backups` Docker volume. Backups are kept according to this
-retention policy:
-
-| Tier | Kept |
-|------|------|
-| Daily | 7 dumps |
-| Weekly | 4 dumps |
-| Monthly | 6 dumps |
-
-**Listing backups**
-
-```bash
-docker compose exec db-backup ls /backups/last /backups/weekly /backups/monthly
-```
-
-**Manually triggering a backup**
-
-```bash
-docker compose exec db-backup /backup.sh
-```
-
-**Restoring a backup**
-
-```bash
-# Pick a file, e.g. /backups/last/vyhub-2024-01-15T020000Z.sql.gz
-docker compose exec db-backup \
-  sh -c 'zcat /backups/last/<filename>.sql.gz | \
-    psql --host=db --username=vyhub --dbname=vyhub'
-```
-
-The vyhub password is in `VYHUB_DB_PASSWORD` inside `.env`.
-
 ## Environment Variables
 
 ### General
@@ -123,3 +86,41 @@ The vyhub password is in `VYHUB_DB_PASSWORD` inside `.env`.
 |-----|------|---------|-------------|
 | VYHUB_BACKEND_URL | URL | - | The URL to the API (with `/v1`)
 
+
+
+## Database backups
+
+The `db-backup` service uses
+[`prodrigestivill/postgres-backup-local`](https://github.com/prodrigestivill/docker-postgres-backup-local)
+to take a daily `pg_dump` of the `vyhub` database and store it compressed
+in the `vyhub-db-backups` Docker volume. Backups are kept according to this
+retention policy:
+
+| Tier | Kept |
+|------|------|
+| Daily | 7 dumps |
+| Weekly | 4 dumps |
+| Monthly | 6 dumps |
+
+**Listing backups**
+
+```bash
+docker compose exec db-backup ls /backups/last /backups/weekly /backups/monthly
+```
+
+**Manually triggering a backup**
+
+```bash
+docker compose exec db-backup /backup.sh
+```
+
+**Restoring a backup**
+
+```bash
+# Pick a file, e.g. /backups/last/vyhub-2024-01-15T020000Z.sql.gz
+docker compose exec db-backup \
+  sh -c 'zcat /backups/last/<filename>.sql.gz | \
+    psql --host=db --username=vyhub --dbname=vyhub'
+```
+
+The vyhub password is in `VYHUB_DB_PASSWORD` inside `.env`.

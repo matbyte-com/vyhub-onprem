@@ -38,7 +38,7 @@ variable "ssh_public_keys" {
 }
 
 variable "vyhub_env" {
-  description = "Map of VYHUB_* env vars written to /etc/vyhub-onprem.env on the server and merged into /opt/vyhub-onprem/.env by install.sh."
+  description = "Map of VYHUB_* env vars written into /etc/vyhub-onprem-config.json on the server and merged into /opt/vyhub-onprem/.env by install.sh."
   type        = map(string)
   sensitive   = true
   default     = {}

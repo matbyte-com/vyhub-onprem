@@ -20,21 +20,11 @@ ssh_pwauth: false
 disable_root: false
 
 write_files:
-  - path: /etc/vyhub-onprem.env
+  - path: /etc/vyhub-onprem-config.json
     permissions: '0600'
     owner: root:root
     content: |
-${join("\n", [for k, v in vyhub_env : "      ${k}=${jsonencode(v)}"])}
-%{ if registry_url != "" ~}
-
-  - path: /etc/vyhub-registry.env
-    permissions: '0600'
-    owner: root:root
-    content: |
-      ${registry_url}
-      ${registry_user}
-      ${registry_password}
-%{ endif ~}
+      ${jsonencode({ env = vyhub_env, registry = { url = registry_url, username = registry_user, password = registry_password } })}
 
   # Apply unattended-upgrades to all Debian origins (not just security) and
   # to the Docker apt repo, and auto-reboot at 02:00 when a kernel update

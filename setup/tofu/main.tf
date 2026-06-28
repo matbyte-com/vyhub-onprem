@@ -9,12 +9,16 @@ locals {
     sha256(regex("^(\\S+\\s+\\S+)", trimspace(k))[0]) => k
   }
 
-  # Existing project-level SSH keys, keyed by the same canonical hash.
+  # Foreign project-level SSH keys, keyed by the same canonical hash.
   # Hetzner rejects re-uploading any pubkey already present in the project
-  # (uniqueness_error / 409), so we reuse these IDs instead.
+  # (uniqueness_error / 409), so we reuse these IDs instead of creating our
+  # own copy. Keys WE manage (named "${server_name}-*") are excluded here —
+  # otherwise this data source would see our own resources and Terraform
+  # would destroy + dangling-reference them on every second apply.
   existing_key_id_by_sha = {
     for k in data.hcloud_ssh_keys.existing.ssh_keys :
     sha256(regex("^(\\S+\\s+\\S+)", trimspace(k.public_key))[0]) => k.id
+    if !startswith(k.name, "${var.server_name}-")
   }
 
   # Only upload pubkeys that aren't already in the project.

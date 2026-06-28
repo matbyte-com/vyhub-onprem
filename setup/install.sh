@@ -8,8 +8,8 @@
 #   - an existing Debian server (run manually after `git clone`).
 #
 # Usage:
-#   sudo ./setup/install.sh                            # interactive
-#   sudo ./setup/install.sh install --non-interactive  # cloud-init path; expects /etc/vyhub-onprem.env
+#   sudo ./setup/install.sh                            # interactive (paste the vyhub.net config string)
+#   sudo ./setup/install.sh install --non-interactive  # cloud-init path; expects /etc/vyhub-onprem-config.json
 #   sudo ./setup/install.sh certbot --email <addr> [--domain <host>]
 #   sudo ./setup/install.sh update                     # git pull + docker compose pull/up
 #
@@ -18,8 +18,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-VYHUB_ENV_FILE="${VYHUB_ENV_FILE:-/etc/vyhub-onprem.env}"
-REGISTRY_ENV_FILE="${REGISTRY_ENV_FILE:-/etc/vyhub-registry.env}"
+# Single JSON config of the shape produced by the vyhub.net Setup dialog:
+#   { "env": { "VYHUB_*": "..." }, "registry": { "url", "username", "password" } }
+# cloud-init writes this directly; interactively we decode it from the
+# base64 string the dialog hands out (same string setup.sh consumes).
+CONFIG_FILE="${CONFIG_FILE:-/etc/vyhub-onprem-config.json}"
 READY_FLAG="${READY_FLAG:-/var/lib/vyhub-onprem-ready}"
 
 # Keep in sync with setup/setup.sh REQUIRED_VYHUB_KEYS.
@@ -67,15 +70,6 @@ prompt() {
     read -r -p "$message: " reply || true
     printf '%s' "$reply"
   fi
-}
-
-prompt_yes_no() {
-  local message="$1" default="${2:-n}" reply
-  local hint="[y/N]"
-  [ "$default" = "y" ] && hint="[Y/n]"
-  read -r -p "$message $hint: " reply || true
-  reply="${reply:-$default}"
-  case "$reply" in y|Y|yes|YES) return 0 ;; *) return 1 ;; esac
 }
 
 env_value() {
@@ -142,73 +136,84 @@ install_docker() {
   systemctl enable --now docker
 }
 
-# ---------- vyhub env capture --------------------------------------------------
+# ---------- config ingestion ---------------------------------------------------
 
-paste_env_block() {
-  local out="$1"
-  cat <<'EOF'
-Generate the env block at https://www.vyhub.net (Setup dialog) and paste it
-below. It looks like:
-
-  VYHUB_BASE_URL="https://example.com/api"
-  VYHUB_FRONTEND_URL="https://example.com"
-  VYHUB_BACKEND_URL="https://example.com/api/v1"
-  VYHUB_INSTANCE_ID="..."
-  VYHUB_INSTANCE_UID="..."
-  VYHUB_SECRET="..."
-  VYHUB_AUTH_CENTRAL_CLIENT_ID="..."
-  VYHUB_AUTH_CENTRAL_CLIENT_SECRET="..."
-
-Paste the block, then press Ctrl-D on a new line to finish:
-EOF
-  # Atomic write: stage in a tmpfile so a Ctrl-C mid-paste doesn't leave a
-  # half-written $out that the next run mistakes for valid input.
-  local tmp="${out}.tmp"
-  ( umask 077; cat > "$tmp" )
-  if [ ! -s "$tmp" ]; then
-    rm -f "$tmp"
-    die "no input received"
-  fi
-  chmod 600 "$tmp"
-  mv "$tmp" "$out"
+# Decode + validate the base64 config string; echoes the JSON on success.
+decode_config_blob() {
+  local blob="$1" decoded
+  blob="${blob//[[:space:]]/}"
+  [ -n "$blob" ] || return 1
+  decoded="$(printf '%s' "$blob" | base64 -d 2>/dev/null)" || return 1
+  printf '%s' "$decoded" | jq -e . >/dev/null 2>&1 || return 1
+  printf '%s' "$decoded"
 }
 
-capture_vyhub_env() {
-  if [ -f "$VYHUB_ENV_FILE" ]; then
-    info "using existing $VYHUB_ENV_FILE"
-  elif [ "$NON_INTERACTIVE" -eq 1 ]; then
-    die "$VYHUB_ENV_FILE is missing and --non-interactive is set"
-  else
-    section "VyHub instance configuration"
-    paste_env_block "$VYHUB_ENV_FILE"
+prompt_config_blob() {
+  cat <<'EOF'
+Open the Setup dialog at https://www.vyhub.net, select the "Automated"
+install option and copy the single config string shown there. Paste it on
+the line below and press Enter:
 
-    if ! grep -q '^[[:space:]]*VYHUB_AUTH_STEAM_KEY=' "$VYHUB_ENV_FILE"; then
-      say ""
-      say "  A Steam Web API key is needed for Steam login. Get one at:"
-      say "  https://steamcommunity.com/dev/apikey"
-      local steam_key
-      steam_key="$(prompt "VYHUB_AUTH_STEAM_KEY (optional, press enter to skip)")"
-      if [ -n "$steam_key" ]; then
-        printf 'VYHUB_AUTH_STEAM_KEY="%s"\n' "$steam_key" >> "$VYHUB_ENV_FILE"
-      fi
+EOF
+  local blob json
+  while :; do
+    read -r -p "> " blob || true
+    if json="$(decode_config_blob "$blob")"; then
+      break
+    fi
+    warn "could not decode the config string — please copy it again"
+  done
+
+  # Optional Steam key, injected into the env object.
+  if [ "$(printf '%s' "$json" | jq -r '.env.VYHUB_AUTH_STEAM_KEY // empty')" = "" ]; then
+    say ""
+    say "  A Steam Web API key is needed for Steam login. Get one at:"
+    say "  https://steamcommunity.com/dev/apikey"
+    local steam_key
+    steam_key="$(prompt "VYHUB_AUTH_STEAM_KEY (optional, press enter to skip)")"
+    if [ -n "$steam_key" ]; then
+      json="$(printf '%s' "$json" | jq --arg v "$steam_key" '.env.VYHUB_AUTH_STEAM_KEY = $v')"
     fi
   fi
 
+  ( umask 077; printf '%s\n' "$json" > "$CONFIG_FILE" )
+  chmod 600 "$CONFIG_FILE"
+}
+
+load_config() {
+  if [ -f "$CONFIG_FILE" ]; then
+    info "using existing $CONFIG_FILE"
+  elif [ "$NON_INTERACTIVE" -eq 1 ]; then
+    die "$CONFIG_FILE is missing and --non-interactive is set"
+  else
+    section "VyHub instance configuration"
+    prompt_config_blob
+  fi
+
+  jq -e . "$CONFIG_FILE" >/dev/null 2>&1 || die "$CONFIG_FILE is not valid JSON"
+
   local missing=()
   for k in "${REQUIRED_VYHUB_KEYS[@]}"; do
-    if ! grep -qE "^[[:space:]]*${k}=" "$VYHUB_ENV_FILE"; then
+    if [ "$(jq -r --arg k "$k" '.env[$k] // empty' "$CONFIG_FILE")" = "" ]; then
       missing+=("$k")
     fi
   done
   if [ "${#missing[@]}" -gt 0 ]; then
-    die "missing required vars in $VYHUB_ENV_FILE: ${missing[*]}"
+    die "missing required env vars in $CONFIG_FILE: ${missing[*]}"
   fi
-  ok "validated $VYHUB_ENV_FILE"
+  ok "validated $CONFIG_FILE ($(jq '.env | length' "$CONFIG_FILE") env vars)"
 }
 
+# Render the env object to KEY="value" lines and merge into .env, replacing
+# any keys already present in the baseline template.
 merge_vyhub_env() {
   cd "$REPO_ROOT"
-  awk -v src="$VYHUB_ENV_FILE" '
+  local env_file
+  env_file="$(mktemp)"
+  chmod 600 "$env_file"
+  jq -r '.env | to_entries[] | "\(.key)=\(.value | @json)"' "$CONFIG_FILE" > "$env_file"
+
+  awk -v src="$env_file" '
     BEGIN {
       n = 0
       while ((getline line < src) > 0) {
@@ -230,6 +235,7 @@ merge_vyhub_env() {
       print
     }
   ' .env > .env.tmp
+  rm -f "$env_file"
   mv .env.tmp .env
   chmod 644 .env
   ok "merged VyHub env vars into .env"
@@ -237,71 +243,18 @@ merge_vyhub_env() {
 
 # ---------- registry login -----------------------------------------------------
 
-paste_registry_login() {
-  local out="$1"
-  cat <<'EOF'
-Paste the docker login command from the vyhub.net setup page, e.g.:
-
-  docker login registry.matbyte.com -u 'robot$vyhub+onprem-1234' -p 'TOKEN'
-
-EOF
-  local cmd
-  read -r -p "> " cmd
-  local parsed
-  parsed="$(printf '%s\n' "$cmd" | awk '{
-    url = ""; u = ""; p = ""
-    for (i = 1; i <= NF; i++) {
-      tok = $i
-      gsub(/^'"'"'|'"'"'$|^"|"$/, "", tok)
-      if ($(i) == "-u" && i < NF) { i++; u = $(i); gsub(/^'"'"'|'"'"'$|^"|"$/, "", u) }
-      else if ($(i) == "-p" && i < NF) { i++; p = $(i); gsub(/^'"'"'|'"'"'$|^"|"$/, "", p) }
-      else if (tok != "docker" && tok != "login" && url == "") url = tok
-    }
-    print url "\t" u "\t" p
-  }')"
-
-  local reg_url reg_user reg_pass
-  reg_url="$(printf  '%s' "$parsed" | cut -f1)"
-  reg_user="$(printf '%s' "$parsed" | cut -f2)"
-  reg_pass="$(printf '%s' "$parsed" | cut -f3)"
-  [ -n "$reg_url" ]  || die "could not parse registry URL from command"
-  [ -n "$reg_user" ] || die "could not parse -u from command"
-  [ -n "$reg_pass" ] || die "could not parse -p from command"
-
-  local tmp="${out}.tmp"
-  ( umask 077; printf '%s\n%s\n%s\n' "$reg_url" "$reg_user" "$reg_pass" > "$tmp" )
-  chmod 600 "$tmp"
-  mv "$tmp" "$out"
-  ok "registry credentials captured ($reg_user @ $reg_url)"
-}
-
-capture_registry_login() {
-  if [ -f "$REGISTRY_ENV_FILE" ]; then
-    info "using existing $REGISTRY_ENV_FILE"
-    return 0
-  fi
-  if [ "$NON_INTERACTIVE" -eq 1 ]; then
-    return 0
-  fi
-  section "Container registry"
-  if prompt_yes_no "Configure a container registry login?" y; then
-    paste_registry_login "$REGISTRY_ENV_FILE"
-  fi
-}
-
 do_registry_login() {
-  [ -f "$REGISTRY_ENV_FILE" ] || return 0
-  local url user rc=0
-  url="$(sed -n '1p' "$REGISTRY_ENV_FILE")"
-  user="$(sed -n '2p' "$REGISTRY_ENV_FILE")"
+  local url user pass
+  url="$(jq  -r '.registry.url      // ""' "$CONFIG_FILE")"
+  user="$(jq -r '.registry.username // ""' "$CONFIG_FILE")"
+  pass="$(jq -r '.registry.password // ""' "$CONFIG_FILE")"
+  if [ -z "$url" ] || [ -z "$user" ] || [ -z "$pass" ]; then
+    info "no registry credentials in config; skipping docker login"
+    return 0
+  fi
   info "logging in to $url as $user"
-  # Drop the plaintext password file regardless of login outcome.
-  # Docker stores creds in ~/.docker/config.json on success.
-  sed -n '3p' "$REGISTRY_ENV_FILE" \
-    | docker login "$url" -u "$user" --password-stdin \
-    || rc=$?
-  rm -f "$REGISTRY_ENV_FILE"
-  return "$rc"
+  # Docker persists the credential in ~/.docker/config.json on success.
+  printf '%s' "$pass" | docker login "$url" -u "$user" --password-stdin
 }
 
 # ---------- repo bootstrap -----------------------------------------------------
@@ -388,8 +341,7 @@ cmd_install() {
   install_packages
   install_docker
   run_first_setup
-  capture_vyhub_env
-  capture_registry_login
+  load_config
   merge_vyhub_env
   ensure_placeholder_cert
   do_registry_login

@@ -119,7 +119,8 @@ You will need:
   1. A Hetzner Cloud account                  https://accounts.hetzner.com/signUp
   2. A Hetzner Cloud project                  https://console.hetzner.cloud/projects
   3. A read+write API token in that project   Project -> Security -> API Tokens
-  4. The VyHub instance env vars              from https://www.vyhub.net
+  4. The VyHub instance config string         from https://www.vyhub.net
+                                              (Setup dialog -> Automated -> copy)
   5. An SSH public key on this machine        (e.g. ~/.ssh/id_ed25519.pub)
 
 EOF
@@ -226,87 +227,42 @@ ask_ssh_keys() {
   fi
 }
 
-ask_registry_login() {
-  section "Container registry"
-  cat <<'EOF'
-Paste the docker login command from the vyhub.net setup page, e.g.:
-
-  docker login registry.matbyte.com -u 'robot$vyhub+onprem-1234' -p 'TOKEN'
-
-EOF
-  local cmd
-  read -r -p "> " cmd
-
-  # Parse: docker login <url> [-u <user>] [-p <pass>]
-  # awk strips surrounding single/double quotes from each token.
-  local parsed
-  parsed="$(printf '%s\n' "$cmd" | awk '{
-    url = ""; u = ""; p = ""
-    for (i = 1; i <= NF; i++) {
-      tok = $i
-      gsub(/^'"'"'|'"'"'$|^"|"$/, "", tok)
-      if ($(i) == "-u" && i < NF) { i++; u = $(i); gsub(/^'"'"'|'"'"'$|^"|"$/, "", u) }
-      else if ($(i) == "-p" && i < NF) { i++; p = $(i); gsub(/^'"'"'|'"'"'$|^"|"$/, "", p) }
-      else if (tok != "docker" && tok != "login" && url == "") url = tok
-    }
-    print url "\t" u "\t" p
-  }')"
-
-  REGISTRY_URL="$(printf '%s' "$parsed" | cut -f1)"
-  REGISTRY_USER="$(printf '%s' "$parsed" | cut -f2)"
-  REGISTRY_PASS="$(printf '%s' "$parsed" | cut -f3)"
-
-  [ -n "$REGISTRY_URL" ]  || die "could not parse registry URL from command"
-  [ -n "$REGISTRY_USER" ] || die "could not parse -u from command"
-  [ -n "$REGISTRY_PASS" ] || die "could not parse -p from command"
-  ok "registry credentials captured (user: $REGISTRY_USER @ $REGISTRY_URL)"
-}
-
-ask_env_vars() {
+ask_config_blob() {
   section "VyHub instance configuration"
   cat <<'EOF'
-Generate the env block at https://www.vyhub.net (Setup dialog) and paste it
-below. It looks like:
+Open the Setup dialog at https://www.vyhub.net, select "Automated
+(Hetzner Cloud)" and copy the single config string shown there. Paste
+it on the line below and press Enter (no Ctrl-D required):
 
-  VYHUB_BASE_URL="https://example.com/api"
-  VYHUB_FRONTEND_URL="https://example.com"
-  VYHUB_BACKEND_URL="https://example.com/api/v1"
-  VYHUB_INSTANCE_ID="..."
-  VYHUB_INSTANCE_UID="..."
-  VYHUB_SECRET="..."
-  VYHUB_AUTH_CENTRAL_CLIENT_ID="..."
-  VYHUB_AUTH_CENTRAL_CLIENT_SECRET="..."
-
-Paste the block, then press Ctrl-D on a new line to finish:
 EOF
-  local block
-  block="$(cat)"
 
-  # Parse KEY="value" / KEY=value lines into a JSON object via jq.
-  ENV_JSON="$(printf '%s\n' "$block" | awk '
-    /^[[:space:]]*#/ {next}
-    /^[[:space:]]*$/ {next}
-    {
-      line=$0
-      sub(/^[[:space:]]*/, "", line)
-      pos = index(line, "=")
-      if (pos == 0) next
-      key = substr(line, 1, pos-1)
-      val = substr(line, pos+1)
-      sub(/[[:space:]]*#.*$/, "", val)
-      sub(/[[:space:]]+$/, "", val)
-      if (val ~ /^".*"$/ || val ~ /^'\''.*'\''$/) {
-        val = substr(val, 2, length(val)-2)
-      }
-      printf "%s\t%s\n", key, val
-    }
-  ' | jq -R -s '
-      split("\n")
-      | map(select(length > 0))
-      | map(split("\t"))
-      | map({(.[0]): (.[1] // "")})
-      | add // {}
-    ')"
+  local blob decoded
+  while :; do
+    read -r -p "> " blob || true
+    blob="${blob//[[:space:]]/}"
+    [ -n "$blob" ] || { warn "config string must not be empty"; continue; }
+
+    decoded="$(printf '%s' "$blob" | base64 -d 2>/dev/null || true)"
+    if [ -z "$decoded" ]; then
+      warn "could not base64-decode the input — please copy the string again"
+      continue
+    fi
+    if ! printf '%s' "$decoded" | jq -e . >/dev/null 2>&1; then
+      warn "decoded payload is not valid JSON — please copy the string again"
+      continue
+    fi
+    break
+  done
+
+  ENV_JSON="$(printf '%s' "$decoded" | jq '.env')"
+  REGISTRY_URL="$(printf '%s'  "$decoded" | jq -r '.registry.url // ""')"
+  REGISTRY_USER="$(printf '%s' "$decoded" | jq -r '.registry.username // ""')"
+  REGISTRY_PASS="$(printf '%s' "$decoded" | jq -r '.registry.password // ""')"
+
+  [ "$ENV_JSON" != "null" ] || die "config string is missing the 'env' object"
+  [ -n "$REGISTRY_URL" ]    || die "config string is missing 'registry.url'"
+  [ -n "$REGISTRY_USER" ]   || die "config string is missing 'registry.username'"
+  [ -n "$REGISTRY_PASS" ]   || die "config string is missing 'registry.password'"
 
   local missing=()
   for k in "${REQUIRED_VYHUB_KEYS[@]}"; do
@@ -315,9 +271,11 @@ EOF
     fi
   done
   if [ "${#missing[@]}" -gt 0 ]; then
-    warn "missing required vars: ${missing[*]}"
-    die "please re-run and paste a complete env block"
+    warn "config string is missing required env vars: ${missing[*]}"
+    die "please re-generate the config string and try again"
   fi
+
+  ok "captured $(printf '%s' "$ENV_JSON" | jq 'length') env vars + registry creds for $REGISTRY_USER @ $REGISTRY_URL"
 
   local steam_key
   say ""
@@ -327,8 +285,6 @@ EOF
   if [ -n "$steam_key" ]; then
     ENV_JSON="$(printf '%s' "$ENV_JSON" | jq --arg v "$steam_key" '. + {VYHUB_AUTH_STEAM_KEY: $v}')"
   fi
-
-  ok "captured $(printf '%s' "$ENV_JSON" | jq 'length') env vars"
 }
 
 ask_backups() {
@@ -565,8 +521,7 @@ cmd_full() {
   ask_location
   ask_server_type
   ask_ssh_keys
-  ask_registry_login
-  ask_env_vars
+  ask_config_blob
   ask_backups
   write_tfvars
   run_tofu_apply
