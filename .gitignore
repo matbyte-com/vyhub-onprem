@@ -4,15 +4,19 @@ docker-compose.override.yml
 vyhub.crt
 vyhub.key
 
-# setup/ artifacts
-setup/.known_hosts
-setup/tofu/.terraform/
-setup/tofu/.terraform.lock.hcl
-setup/tofu/terraform.tfstate
-setup/tofu/terraform.tfstate.*
-setup/tofu/terraform.tfvars
-setup/tofu/terraform.tfvars.json
-setup/tofu/*.auto.tfvars
-setup/tofu/*.auto.tfvars.json
-setup/tofu/crash.log
-setup/tofu/crash.*.log
+# transient ACME http-01 challenge files
+nginx/certbot-webroot/*
+!nginx/certbot-webroot/.gitkeep
+
+# provisioning artifacts
+.known_hosts
+tofu/.terraform/
+tofu/.terraform.lock.hcl
+tofu/terraform.tfstate
+tofu/terraform.tfstate.*
+tofu/terraform.tfvars
+tofu/terraform.tfvars.json
+tofu/*.auto.tfvars
+tofu/*.auto.tfvars.json
+tofu/crash.log
+tofu/crash.*.log

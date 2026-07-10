@@ -3,7 +3,7 @@
 Two installation methods, sharing the same server-side installer
 (`install.sh`):
 
-- **Method 1 — provision a new Hetzner VM (`setup.sh`).** Laptop-side
+- **Method 1 — provision a new Hetzner VM (`hcloud-setup.sh`).** Laptop-side
   driver that provisions a fresh Hetzner Cloud VM with [OpenTofu], then
   hands off to `install.sh` on the VM via [cloud-init]. Use this when you
   don't have a server yet. → [Usage](#usage--provision-a-new-hetzner-vm)
@@ -20,9 +20,9 @@ Two installation methods, sharing the same server-side installer
 
 ## What it does
 
-1. `setup.sh` asks for a Hetzner Cloud API token, location, server type
+1. `hcloud-setup.sh` asks for a Hetzner Cloud API token, location, server type
    and SSH key.
-2. `setup.sh` asks for a single VyHub config string. Generate it at
+2. `hcloud-setup.sh` asks for a single VyHub config string. Generate it at
    <https://www.vyhub.net> → Setup dialog → **Automated (Hetzner Cloud)**
    and paste it on one line — it contains both the VyHub `VYHUB_*` env
    vars and the container registry credentials, encoded as
@@ -35,25 +35,25 @@ Two installation methods, sharing the same server-side installer
 4. Cloud-init on the server writes `/etc/vyhub-onprem-config.json` (a single
    JSON object holding the `env` vars and `registry` credentials), clones
    this repo to `/opt/vyhub-onprem`, and runs
-   `setup/install.sh install --non-interactive`. The installer:
+   `install.sh install --non-interactive`. The installer:
    - installs Docker (via `get.docker.com`), `git`, `certbot`, `fail2ban`,
      `jq`, `openssl`, and enables unattended security upgrades,
-   - runs `first-setup.sh` to generate a baseline `.env` and
+   - runs `gen-secrets.sh` to generate a baseline `.env` and
      `docker-compose.override.yml` (with random DB passwords / secrets),
    - merges your VyHub env vars into `.env` (de-duplicated),
    - drops a placeholder self-signed cert into `nginx/certs/`,
    - logs in to the container registry (if creds were provided),
    - `docker compose up -d` the stack and writes
      `/var/lib/vyhub-onprem-ready` when it's done.
-5. `setup.sh` prints the A/AAAA records you need to create.
-6. Optionally `setup.sh` runs `install.sh certbot ...` on the server to
+5. `hcloud-setup.sh` prints the A/AAAA records you need to create.
+6. Optionally `hcloud-setup.sh` runs `install.sh certbot ...` on the server to
    replace the self-signed cert with a Let's Encrypt cert for
    `VYHUB_FRONTEND_URL` (and installs a deploy hook so renewals are
    picked up automatically).
 
 ## Prerequisites
 
-On your laptop:
+On your laptop (a Linux machine, or WSL on Windows):
 
 - [`tofu`](https://opentofu.org/docs/intro/install/) >= 1.6
 - `ssh`, `ssh-keygen`, `curl`, `jq`, `openssl`
@@ -79,23 +79,22 @@ From <https://www.vyhub.net>:
 ## Usage — provision a new Hetzner VM
 
 ```bash
-cd setup
-./setup.sh
+./hcloud-setup.sh
 ```
 
 The script is idempotent for the parts that matter. If something blows up
 mid-way you can re-run individual steps:
 
 ```bash
-./setup.sh apply      # re-run `tofu apply` with the saved tfvars
-./setup.sh outputs    # show server IPs + management cheatsheet
-./setup.sh wait       # block until cloud-init finishes (streams the log)
-./setup.sh logs       # tail the cloud-init / install.sh output log
-./setup.sh ssh        # ssh root@<server>
-./setup.sh ssh "cd /opt/vyhub-onprem && docker compose logs -f"
-./setup.sh certbot    # request / replace the Let's Encrypt cert
-./setup.sh redeploy   # destroy + reprovision from scratch (typed confirm)
-./setup.sh destroy    # delete the Hetzner resources
+./hcloud-setup.sh apply      # re-run `tofu apply` with the saved tfvars
+./hcloud-setup.sh outputs    # show server IPs + management cheatsheet
+./hcloud-setup.sh wait       # block until cloud-init finishes (streams the log)
+./hcloud-setup.sh logs       # tail the cloud-init / install.sh output log
+./hcloud-setup.sh ssh        # ssh root@<server>
+./hcloud-setup.sh ssh "cd /opt/vyhub-onprem && docker compose logs -f"
+./hcloud-setup.sh certbot    # request / replace the Let's Encrypt cert
+./hcloud-setup.sh redeploy   # destroy + reprovision from scratch (typed confirm)
+./hcloud-setup.sh destroy    # delete the Hetzner resources
 ```
 
 ## Usage — install on an existing Debian server
@@ -106,11 +105,11 @@ OpenTofu entirely and run `install.sh` directly:
 ```bash
 git clone https://github.com/matbyte-com/vyhub-onprem.git /opt/vyhub-onprem
 cd /opt/vyhub-onprem
-sudo ./setup/install.sh
+sudo ./install.sh
 ```
 
 You will be prompted to paste the single config string from the Setup
-dialog at <https://www.vyhub.net> (the same base64 string `setup.sh`
+dialog at <https://www.vyhub.net> (the same base64 string `hcloud-setup.sh`
 consumes). It carries both the `VYHUB_*` env vars and the container
 registry login.
 
@@ -118,7 +117,7 @@ Once DNS for `VYHUB_FRONTEND_URL` resolves to the server, request a
 Let's Encrypt certificate:
 
 ```bash
-sudo ./setup/install.sh certbot --email you@example.com
+sudo ./install.sh certbot --email you@example.com
 ```
 
 Non-interactive use (e.g. driven by your own automation) is supported by
@@ -127,10 +126,10 @@ form `{"env": {"VYHUB_*": "..."}, "registry": {"url": "...", "username":
 "...", "password": "..."}}` and running:
 
 ```bash
-sudo ./setup/install.sh install --non-interactive
+sudo ./install.sh install --non-interactive
 ```
 
-State and inputs live under `setup/tofu/`:
+State and inputs live under `tofu/`:
 
 - `terraform.tfvars.json` - the answers you gave (chmod 600, gitignored).
 - `terraform.tfstate` - OpenTofu state (chmod 600, gitignored). **Don't
@@ -142,30 +141,30 @@ State and inputs live under `setup/tofu/`:
 After `tofu apply` the script prints the IPs and the records you need to
 create. Create both `A` and `AAAA`. The script will not block on DNS - you
 can either wait for propagation now and continue, or skip the cert step
-and re-run `./setup.sh certbot` once the records have spread.
+and re-run `./hcloud-setup.sh certbot` once the records have spread.
 
 The script uses `dig` (if available) to warn you when DNS still points
 somewhere else.
 
 ## TLS / Let's Encrypt
 
-The cert step uses `certbot --standalone`, which needs to bind port 80.
-The script briefly stops the `nginx` container, requests the cert, copies
-the resulting fullchain/privkey into `/opt/vyhub-onprem/nginx/certs/` (the
-paths the bundled `nginx/vyhub.conf` reads from), and starts nginx again.
+This step gets a free, trusted HTTPS certificate from Let's Encrypt and
+switches your site over from the temporary self-signed one. Your site
+stays online the whole time — there's no downtime.
 
-A renewal deploy hook is installed at
-`/etc/letsencrypt/renewal-hooks/deploy/vyhub-onprem.sh` so future renewals
-(driven by the `certbot.timer` systemd timer) re-copy the cert and
-restart nginx automatically. No cron entry to maintain.
+Certificates expire every 90 days, so the server renews them for you
+automatically in the background well before they run out. You don't need
+to set up any reminders or scheduled jobs — just make sure your domain
+keeps pointing at the server.
 
 ## Layout
 
 ```
-setup/
-├── README.md                  - this file
-├── setup.sh                   - laptop-side driver (OpenTofu + Hetzner)
+.
+├── INSTALL.md                 - this file
+├── hcloud-setup.sh            - laptop-side driver (OpenTofu + Hetzner)
 ├── install.sh                 - server-side installer (Debian/Ubuntu)
+├── gen-secrets.sh             - baseline .env / secret generator (called by install.sh)
 └── tofu/
     ├── versions.tf
     ├── variables.tf
@@ -196,7 +195,7 @@ Inspect / control on the server:
 systemctl list-timers --all | grep -E 'vyhub|apt-daily'
 journalctl -u vyhub-onprem-update.service  # container update logs
 journalctl -u unattended-upgrades.service  # OS upgrade logs
-sudo /opt/vyhub-onprem/setup/install.sh update   # run a container update on demand
+sudo /opt/vyhub-onprem/install.sh update   # run a container update on demand
 ```
 
 ### Disk-fill safeguards
@@ -230,12 +229,12 @@ docker compose logs autoheal
   cheapest disaster-recovery option here.
 - **Updating the app.** Happens automatically nightly (see above). To
   trigger a manual update: ssh in and run
-  `sudo /opt/vyhub-onprem/setup/install.sh update`.
+  `sudo /opt/vyhub-onprem/install.sh update`.
 - **Rotating secrets.** `VYHUB_SESSION_SECRET` / `VYHUB_CRYPT_SECRET` /
-  the DB passwords are auto-generated by `first-setup.sh` on the server
+  the DB passwords are auto-generated by `gen-secrets.sh` on the server
   and never leave it. To rotate, log in and edit `.env` /
   `docker-compose.override.yml` directly.
-- **Tearing down.** `./setup.sh destroy` removes the server, the
+- **Tearing down.** `./hcloud-setup.sh destroy` removes the server, the
   firewall and the SSH key resource. Local state in `tofu/` and your
   Hetzner project itself are kept.
 

@@ -4,17 +4,17 @@ This is the on-prem version of VyHub. (Also known as "Selfhosting")
 
 ## Installation methods
 
-Pick whichever matches what you already have. The first two are automated
-by the scripts in [`setup/`](setup/README.md) — see
-[`setup/README.md`](setup/README.md) for the full walkthrough.
+Pick whichever matches what you already have. Methods 2 and 3 are
+automated by the top-level scripts — see [`INSTALL.md`](INSTALL.md) for
+the full walkthrough.
 
 | Method | Use when | How |
 |--------|----------|-----|
-| **1. One-shot on Hetzner Cloud** | You have no server yet and want everything provisioned for you. | Run `cd setup && ./setup.sh` on your laptop. [OpenTofu] spins up a Debian 13 + Docker VM, clones this repo to it, applies your `VYHUB_*` env block, and optionally requests a Let's Encrypt cert. |
-| **2. Existing Debian/Ubuntu server** | You already manage a host (any provider, or bare metal). | `git clone` this repo to the server and run `sudo ./setup/install.sh`. Installs Docker + dependencies, generates secrets, and brings the stack up. Supports a `--non-interactive` mode for your own automation. |
-| **3. Fully manual** | You want to wire up `docker compose` yourself. | Follow the [docs](https://docs.vyhub.net/latest/getting_started/selfhosting/#installing). |
+| **1. Install on a server with Docker / Docker Compose** | You already have a host with Docker and Docker Compose set up. | Follow the [docs](https://docs.vyhub.net/latest/getting_started/selfhosting/#installing) to wire up `docker compose` yourself. |
+| **2. Existing Debian/Ubuntu server** | You manage a Debian/Ubuntu host (any provider, or bare metal) without Docker yet. | `git clone` this repo to the server and run `sudo ./install.sh`. Installs Docker + dependencies, generates secrets, and brings the stack up. Supports a `--non-interactive` mode for your own automation. |
+| **3. One-shot on Hetzner Cloud** | You have no server yet and want everything provisioned for you. | Run `./hcloud-setup.sh` from a Linux machine (or WSL on Windows). [OpenTofu] spins up a Debian 13 + Docker VM, clones this repo to it, applies your `VYHUB_*` env block, and optionally requests a Let's Encrypt cert. |
 
-Methods 1 and 2 share the same server-side installer (`install.sh`) and
+Methods 2 and 3 share the same server-side installer (`install.sh`) and
 both set up nightly auto-updates, self-healing healthchecks, and daily DB
 backups out of the box.
 
@@ -54,14 +54,14 @@ backups out of the box.
 
 | Var | Values | Default | Description |
 |-----|------|---------|-------------|
-| VYHUB_SERVER_DEBUG | true/false | false | Enables debug mode which causes stack traces to be printed. Should be false in production.
-| VYHUB_SERVER_ECHO | true/false | false | Enables output of all SQL queries (to stdout)
-| VYHUB_SERVER_SECURE | true/false | true | Enables HTTPS for the application. Not required with a reverse proxy (nginx).
-| VYHUB_SERVER_GEN_CERT | true/false | false | Generates self-signed TLS certificates on startup for HTTPS
+| VYHUB_SERVER_DEBUG | true/false | false   | Enables debug mode which causes stack traces to be printed. Should be false in production.
+| VYHUB_SERVER_ECHO | true/false | false   | Enables output of all SQL queries (to stdout)
+| VYHUB_SERVER_SECURE | true/false | true    | Enables HTTPS for the application. Not required with a reverse proxy (nginx).
+| VYHUB_SERVER_GEN_CERT | true/false | false   | Generates self-signed TLS certificates on startup for HTTPS
 | VYHUB_SERVER_HOST | String | 0.0.0.0 | Sets the IP on which the application listens for requests
-| VYHUB_SERVER_FORWARD_IPS | String | * | Specifies which IP-addresses are allowed to forward proxy traffic
-| VYHUB_SERVER_PORT | Integer | 5050 | Specifies on which port the application listens
-| VYHUB_SERVER_WORKERS | Integer | 1 | Specifies how many processes of the application are running. Can be slightly increased for more performance. (Caution: Make sure that enough memory (around 400MiB each) and postgres database connections (15 by default) are available)
+| VYHUB_SERVER_FORWARD_IPS | String | *       | Specifies which IP-addresses are allowed to forward proxy traffic
+| VYHUB_SERVER_PORT | Integer | 5050    | Specifies on which port the application listens
+| VYHUB_SERVER_WORKERS | Integer | 3       | Specifies how many processes of the application are running. Can be slightly increased for more performance. (Caution: Make sure that for each worker, enough memory (around 500MiB) and postgres database connections (15 by default) are available)
 
 ### Mail
 

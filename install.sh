@@ -4,28 +4,28 @@
 #
 # Installs Docker + dependencies on a Debian/Ubuntu host and brings the
 # vyhub-onprem stack up. Designed to work on both:
-#   - a fresh cloud-init VM (driven by setup/tofu/), and
+#   - a fresh cloud-init VM (driven by tofu/), and
 #   - an existing Debian server (run manually after `git clone`).
 #
 # Usage:
-#   sudo ./setup/install.sh                            # interactive (paste the vyhub.net config string)
-#   sudo ./setup/install.sh install --non-interactive  # cloud-init path; expects /etc/vyhub-onprem-config.json
-#   sudo ./setup/install.sh certbot --email <addr> [--domain <host>]
-#   sudo ./setup/install.sh update                     # git pull + docker compose pull/up
+#   sudo ./install.sh                            # interactive (paste the vyhub.net config string)
+#   sudo ./install.sh install --non-interactive  # cloud-init path; expects /etc/vyhub-onprem-config.json
+#   sudo ./install.sh certbot --email <addr> [--domain <host>]
+#   sudo ./install.sh update                     # git pull + docker compose pull/up
 #
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$SCRIPT_DIR"
 
 # Single JSON config of the shape produced by the vyhub.net Setup dialog:
 #   { "env": { "VYHUB_*": "..." }, "registry": { "url", "username", "password" } }
 # cloud-init writes this directly; interactively we decode it from the
-# base64 string the dialog hands out (same string setup.sh consumes).
+# base64 string the dialog hands out (same string hcloud-setup.sh consumes).
 CONFIG_FILE="${CONFIG_FILE:-/etc/vyhub-onprem-config.json}"
 READY_FLAG="${READY_FLAG:-/var/lib/vyhub-onprem-ready}"
 
-# Keep in sync with setup/setup.sh REQUIRED_VYHUB_KEYS.
+# Keep in sync with hcloud-setup.sh REQUIRED_VYHUB_KEYS.
 REQUIRED_VYHUB_KEYS=(
   VYHUB_BASE_URL
   VYHUB_FRONTEND_URL
@@ -262,11 +262,11 @@ do_registry_login() {
 run_first_setup() {
   cd "$REPO_ROOT"
   if [ -f .env ] && [ -f docker-compose.override.yml ]; then
-    info "first-setup.sh already executed"
+    info "gen-secrets.sh already executed"
     return 0
   fi
   section "Generating baseline .env and docker-compose.override.yml"
-  bash ./first-setup.sh
+  bash ./gen-secrets.sh
 }
 
 ensure_placeholder_cert() {
@@ -306,7 +306,7 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/bash $REPO_ROOT/setup/install.sh update
+ExecStart=/usr/bin/bash $REPO_ROOT/install.sh update
 EOF
 
   cat > /etc/systemd/system/vyhub-onprem-update.timer <<'EOF'
@@ -396,11 +396,13 @@ cmd_certbot() {
   section "Let's Encrypt certificate for $domain"
   cd "$REPO_ROOT"
 
-  # Free port 80 so certbot --standalone can listen.
-  docker compose stop nginx >/dev/null 2>&1 || true
+  # nginx serves the http-01 challenge from a shared webroot, so it must be
+  # running. No downtime: the challenge is answered while nginx keeps serving.
+  mkdir -p nginx/certbot-webroot
+  docker compose up -d nginx
 
-  certbot certonly --standalone --non-interactive --agree-tos \
-    --no-eff-email -m "$email" -d "$domain"
+  certbot certonly --webroot -w "$REPO_ROOT/nginx/certbot-webroot" \
+    --non-interactive --agree-tos --no-eff-email -m "$email" -d "$domain"
 
   mkdir -p nginx/certs
   install -m 644 "/etc/letsencrypt/live/$domain/fullchain.pem" nginx/certs/vyhub.crt
@@ -416,14 +418,14 @@ case " \$RENEWED_DOMAINS " in
   *" \$DOMAIN "*)
     install -m 644 "/etc/letsencrypt/live/\$DOMAIN/fullchain.pem" "\$TARGET/nginx/certs/vyhub.crt"
     install -m 600 "/etc/letsencrypt/live/\$DOMAIN/privkey.pem"   "\$TARGET/nginx/certs/vyhub.key"
-    cd "\$TARGET" && docker compose restart nginx
+    cd "\$TARGET" && docker compose exec -T nginx nginx -s reload
     ;;
 esac
 HOOK
   chmod +x /etc/letsencrypt/renewal-hooks/deploy/vyhub-onprem.sh
 
   systemctl enable --now certbot.timer >/dev/null 2>&1 || true
-  docker compose up -d nginx
+  docker compose exec -T nginx nginx -s reload
   ok "cert installed for $domain; renewals handled by certbot.timer"
 }
 

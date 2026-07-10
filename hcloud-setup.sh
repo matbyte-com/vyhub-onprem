@@ -7,15 +7,15 @@
 # a few convenience subcommands for day-2 operations.
 #
 # Usage:
-#   ./setup.sh              # full interactive flow (default)
-#   ./setup.sh apply        # re-run `tofu apply` with the saved inputs
-#   ./setup.sh outputs      # print server IPs and management hints
-#   ./setup.sh ssh          # ssh into the provisioned server as root
-#   ./setup.sh wait         # block until cloud-init finishes
-#   ./setup.sh logs         # tail the cloud-init / install.sh output log
-#   ./setup.sh certbot      # request/replace Let's Encrypt cert
-#   ./setup.sh redeploy     # destroy and reprovision the server (requires typed confirmation)
-#   ./setup.sh destroy      # tear down the Hetzner resources
+#   ./hcloud-setup.sh              # full interactive flow (default)
+#   ./hcloud-setup.sh apply        # re-run `tofu apply` with the saved inputs
+#   ./hcloud-setup.sh outputs      # print server IPs and management hints
+#   ./hcloud-setup.sh ssh          # ssh into the provisioned server as root
+#   ./hcloud-setup.sh wait         # block until cloud-init finishes
+#   ./hcloud-setup.sh logs         # tail the cloud-init / install.sh output log
+#   ./hcloud-setup.sh certbot      # request/replace Let's Encrypt cert
+#   ./hcloud-setup.sh redeploy     # destroy and reprovision the server (requires typed confirmation)
+#   ./hcloud-setup.sh destroy      # tear down the Hetzner resources
 #
 set -euo pipefail
 
@@ -25,7 +25,7 @@ TFVARS_FILE="$TOFU_DIR/terraform.tfvars.json"
 
 VYHUB_SUPPORT_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJXoL+aYkM3veLoFitbjhjvC00spglkOKQeaOAdT8p7d vyhub-support"
 
-# Keep in sync with setup/install.sh REQUIRED_VYHUB_KEYS.
+# Keep in sync with install.sh REQUIRED_VYHUB_KEYS.
 REQUIRED_VYHUB_KEYS=(
   VYHUB_BASE_URL
   VYHUB_FRONTEND_URL
@@ -420,7 +420,7 @@ run_certbot() {
   [ -n "$email" ] || die "email is required"
 
   info "running certbot on the server"
-  ssh_to_server "bash /opt/vyhub-onprem/setup/install.sh certbot --domain '$host' --email '$email'"
+  ssh_to_server "bash /opt/vyhub-onprem/install.sh certbot --domain '$host' --email '$email'"
 
   ok "Let's Encrypt certificate installed; auto-renewal handled by certbot.timer"
 }

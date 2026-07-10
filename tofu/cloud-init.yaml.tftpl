@@ -57,6 +57,6 @@ write_files:
 runcmd:
   - systemctl daemon-reload
   - git clone --branch ${repo_ref} ${repo_url} /opt/vyhub-onprem
-  - bash /opt/vyhub-onprem/setup/install.sh install --non-interactive
+  - bash /opt/vyhub-onprem/install.sh install --non-interactive
 
 final_message: "vyhub-onprem cloud-init finished after $UPTIME seconds"
