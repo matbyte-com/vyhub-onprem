@@ -1,4 +1,5 @@
 web/
+.idea/
 .env
 docker-compose.override.yml
 vyhub.crt
