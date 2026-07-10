@@ -1,0 +1,62 @@
+#cloud-config
+hostname: ${hostname}
+fqdn: ${hostname}
+preserve_hostname: false
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - git
+
+users:
+  - name: root
+    ssh_authorized_keys:
+${join("\n", [for k in ssh_keys : "      - ${k}"])}
+
+ssh_pwauth: false
+disable_root: false
+
+write_files:
+  - path: /etc/vyhub-onprem-config.json
+    permissions: '0600'
+    owner: root:root
+    content: |
+      ${jsonencode({ env = vyhub_env, registry = { url = registry_url, username = registry_user, password = registry_password } })}
+
+  # Apply unattended-upgrades to all Debian origins (not just security) and
+  # to the Docker apt repo, and auto-reboot at 02:00 when a kernel update
+  # requires it. install.sh already enables the apt-daily timers via
+  # /etc/apt/apt.conf.d/20auto-upgrades.
+  - path: /etc/apt/apt.conf.d/99vyhub-onprem
+    permissions: '0644'
+    owner: root:root
+    content: |
+      Unattended-Upgrade::Origins-Pattern {
+          "origin=Debian,codename=$${distro_codename}";
+          "origin=Debian,codename=$${distro_codename}-updates";
+          "site=download.docker.com";
+      };
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "02:00";
+
+  # Run unattended upgrades at 01:00 (kernel reboot at 02:00 if required;
+  # container update timer fires at 03:30 — see install.sh).
+  - path: /etc/systemd/system/apt-daily-upgrade.timer.d/override.conf
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Timer]
+      OnCalendar=
+      OnCalendar=*-*-* 01:00
+      RandomizedDelaySec=30m
+
+runcmd:
+  - systemctl daemon-reload
+  - git clone --branch ${repo_ref} ${repo_url} /opt/vyhub-onprem
+  - bash /opt/vyhub-onprem/install.sh install --non-interactive
+
+final_message: "vyhub-onprem cloud-init finished after $UPTIME seconds"

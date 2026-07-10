@@ -1,5 +1,23 @@
 web/
+.idea/
 .env
 docker-compose.override.yml
 vyhub.crt
 vyhub.key
+
+# transient ACME http-01 challenge files
+nginx/certbot-webroot/*
+!nginx/certbot-webroot/.gitkeep
+
+# provisioning artifacts
+.known_hosts
+tofu/.terraform/
+tofu/.terraform.lock.hcl
+tofu/terraform.tfstate
+tofu/terraform.tfstate.*
+tofu/terraform.tfvars
+tofu/terraform.tfvars.json
+tofu/*.auto.tfvars
+tofu/*.auto.tfvars.json
+tofu/crash.log
+tofu/crash.*.log

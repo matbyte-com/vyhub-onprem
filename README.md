@@ -2,9 +2,23 @@
 
 This is the on-prem version of VyHub. (Also known as "Selfhosting")
 
-## Setup
+## Installation methods
 
-Follow the instructions at [the docs](https://docs.vyhub.net/latest/getting_started/selfhosting/#installing).
+Pick whichever matches what you already have. Methods 2 and 3 are
+automated by the top-level scripts — see [`INSTALL.md`](INSTALL.md) for
+the full walkthrough.
+
+| Method | Use when | How |
+|--------|----------|-----|
+| **1. Install on a server with Docker / Docker Compose** | You already have a host with Docker and Docker Compose set up. | Follow the [docs](https://docs.vyhub.net/latest/getting_started/selfhosting/#installing) to wire up `docker compose` yourself. |
+| **2. Existing Debian/Ubuntu server** | You manage a Debian/Ubuntu host (any provider, or bare metal) without Docker yet. | `git clone` this repo to the server and run `sudo ./install.sh`. Installs Docker + dependencies, generates secrets, and brings the stack up. Supports a `--non-interactive` mode for your own automation. |
+| **3. One-shot on Hetzner Cloud** | You have no server yet and want everything provisioned for you. | Run `./hcloud-setup.sh` from a Linux machine (or WSL on Windows). [OpenTofu] spins up a Debian 13 + Docker VM, clones this repo to it, applies your `VYHUB_*` env block, and optionally requests a Let's Encrypt cert. |
+
+Methods 2 and 3 share the same server-side installer (`install.sh`) and
+both set up nightly auto-updates, self-healing healthchecks, and daily DB
+backups out of the box.
+
+[OpenTofu]: https://opentofu.org
 
 ## Environment Variables
 
@@ -40,14 +54,14 @@ Follow the instructions at [the docs](https://docs.vyhub.net/latest/getting_star
 
 | Var | Values | Default | Description |
 |-----|------|---------|-------------|
-| VYHUB_SERVER_DEBUG | true/false | false | Enables debug mode which causes stack traces to be printed. Should be false in production.
-| VYHUB_SERVER_ECHO | true/false | false | Enables output of all SQL queries (to stdout)
-| VYHUB_SERVER_SECURE | true/false | true | Enables HTTPS for the application. Not required with a reverse proxy (nginx).
-| VYHUB_SERVER_GEN_CERT | true/false | false | Generates self-signed TLS certificates on startup for HTTPS
+| VYHUB_SERVER_DEBUG | true/false | false   | Enables debug mode which causes stack traces to be printed. Should be false in production.
+| VYHUB_SERVER_ECHO | true/false | false   | Enables output of all SQL queries (to stdout)
+| VYHUB_SERVER_SECURE | true/false | true    | Enables HTTPS for the application. Not required with a reverse proxy (nginx).
+| VYHUB_SERVER_GEN_CERT | true/false | false   | Generates self-signed TLS certificates on startup for HTTPS
 | VYHUB_SERVER_HOST | String | 0.0.0.0 | Sets the IP on which the application listens for requests
-| VYHUB_SERVER_FORWARD_IPS | String | * | Specifies which IP-addresses are allowed to forward proxy traffic
-| VYHUB_SERVER_PORT | Integer | 5050 | Specifies on which port the application listens
-| VYHUB_SERVER_WORKERS | Integer | 1 | Specifies how many processes of the application are running. Can be slightly increased for more performance. (Caution: Make sure that enough memory (around 400MiB each) and postgres database connections (15 by default) are available)
+| VYHUB_SERVER_FORWARD_IPS | String | *       | Specifies which IP-addresses are allowed to forward proxy traffic
+| VYHUB_SERVER_PORT | Integer | 5050    | Specifies on which port the application listens
+| VYHUB_SERVER_WORKERS | Integer | 3       | Specifies how many processes of the application are running. Can be slightly increased for more performance. (Caution: Make sure that for each worker, enough memory (around 500MiB) and postgres database connections (15 by default) are available)
 
 ### Mail
 
@@ -72,3 +86,41 @@ Follow the instructions at [the docs](https://docs.vyhub.net/latest/getting_star
 |-----|------|---------|-------------|
 | VYHUB_BACKEND_URL | URL | - | The URL to the API (with `/v1`)
 
+
+
+## Database backups
+
+The `db-backup` service uses
+[`prodrigestivill/postgres-backup-local`](https://github.com/prodrigestivill/docker-postgres-backup-local)
+to take a daily `pg_dump` of the `vyhub` database and store it compressed
+in the `vyhub-db-backups` Docker volume. Backups are kept according to this
+retention policy:
+
+| Tier | Kept |
+|------|------|
+| Daily | 7 dumps |
+| Weekly | 4 dumps |
+| Monthly | 6 dumps |
+
+**Listing backups**
+
+```bash
+docker compose exec db-backup ls /backups/last /backups/weekly /backups/monthly
+```
+
+**Manually triggering a backup**
+
+```bash
+docker compose exec db-backup /backup.sh
+```
+
+**Restoring a backup**
+
+```bash
+# Pick a file, e.g. /backups/last/vyhub-2024-01-15T020000Z.sql.gz
+docker compose exec db-backup \
+  sh -c 'zcat /backups/last/<filename>.sql.gz | \
+    psql --host=db --username=vyhub --dbname=vyhub'
+```
+
+The vyhub password is in `VYHUB_DB_PASSWORD` inside `.env`.

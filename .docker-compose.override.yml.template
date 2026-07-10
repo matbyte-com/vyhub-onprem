@@ -1,10 +1,10 @@
 services:
   app:
-    image: registry.matbyte.com/vyhub/vyhub-onprem:3.3.0
+    # Optionally, set a fixed image to use a specific version of VyHub.
+    # image: registry.matbyte.com/vyhub/vyhub-onprem:3.3.1
   db:
     environment:
       POSTGRES_PASSWORD: GEN_DB_SU_PW # superuser password
-      POSTGRES_VYHUB_PASSWORD: GEN_DB_PW # password for the vyhub user
     # Uncomment to make the database available on the host system at localhost port 15432.
     # Beware to set correct firewall rules to prevent access from the internet.
     # ports:

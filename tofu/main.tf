@@ -1,0 +1,120 @@
+data "hcloud_ssh_keys" "existing" {}
+
+locals {
+  # Canonical identity of a public key: hash of "<algo> <base64>", ignoring
+  # the optional trailing comment so the same key uploaded with a different
+  # comment still matches.
+  input_key_by_sha = {
+    for k in var.ssh_public_keys :
+    sha256(regex("^(\\S+\\s+\\S+)", trimspace(k))[0]) => k
+  }
+
+  # Foreign project-level SSH keys, keyed by the same canonical hash.
+  # Hetzner rejects re-uploading any pubkey already present in the project
+  # (uniqueness_error / 409), so we reuse these IDs instead of creating our
+  # own copy. Keys WE manage (named "${server_name}-*") are excluded here —
+  # otherwise this data source would see our own resources and Terraform
+  # would destroy + dangling-reference them on every second apply.
+  existing_key_id_by_sha = {
+    for k in data.hcloud_ssh_keys.existing.ssh_keys :
+    sha256(regex("^(\\S+\\s+\\S+)", trimspace(k.public_key))[0]) => k.id
+    if !startswith(k.name, "${var.server_name}-")
+  }
+
+  # Only upload pubkeys that aren't already in the project.
+  keys_to_create = {
+    for sha, key in local.input_key_by_sha :
+    substr(sha, 0, 12) => key
+    if !contains(keys(local.existing_key_id_by_sha), sha)
+  }
+
+  # IDs to attach to the server: reused-existing + freshly-created.
+  ssh_key_ids = concat(
+    [for sha, _ in local.input_key_by_sha :
+      local.existing_key_id_by_sha[sha]
+      if contains(keys(local.existing_key_id_by_sha), sha)],
+    [for k in hcloud_ssh_key.this : k.id],
+  )
+
+  cloud_init = templatefile("${path.module}/cloud-init.yaml.tftpl", {
+    hostname          = var.server_name
+    ssh_keys          = var.ssh_public_keys
+    vyhub_env         = var.vyhub_env
+    registry_url      = var.registry_url
+    registry_user     = var.registry_user
+    registry_password = var.registry_password
+    repo_url          = var.repo_url
+    repo_ref          = var.repo_ref
+  })
+}
+
+resource "hcloud_ssh_key" "this" {
+  for_each = local.keys_to_create
+
+  name       = "${var.server_name}-${each.key}"
+  public_key = each.value
+  labels     = var.labels
+}
+
+resource "hcloud_firewall" "this" {
+  name   = "${var.server_name}-fw"
+  labels = var.labels
+
+  rule {
+    description = "SSH"
+    direction   = "in"
+    protocol    = "tcp"
+    port        = "22"
+    source_ips  = ["0.0.0.0/0", "::/0"]
+  }
+
+  rule {
+    description = "HTTP (also used for ACME http-01 challenge)"
+    direction   = "in"
+    protocol    = "tcp"
+    port        = "80"
+    source_ips  = ["0.0.0.0/0", "::/0"]
+  }
+
+  rule {
+    description = "HTTPS"
+    direction   = "in"
+    protocol    = "tcp"
+    port        = "443"
+    source_ips  = ["0.0.0.0/0", "::/0"]
+  }
+
+  rule {
+    description = "ICMP"
+    direction   = "in"
+    protocol    = "icmp"
+    source_ips  = ["0.0.0.0/0", "::/0"]
+  }
+}
+
+resource "hcloud_server" "this" {
+  name        = var.server_name
+  server_type = var.server_type
+  image       = var.image
+  location    = var.location
+  backups     = var.enable_backups
+  user_data   = local.cloud_init
+  ssh_keys    = local.ssh_key_ids
+  labels      = var.labels
+
+  firewall_ids = [hcloud_firewall.this.id]
+
+  public_net {
+    ipv4_enabled = true
+    ipv6_enabled = true
+  }
+
+  lifecycle {
+    ignore_changes = [
+      # user_data changes would force replacement; we manage post-boot
+      # config via SSH instead of recreating the server.
+      user_data,
+      ssh_keys,
+    ]
+  }
+}
