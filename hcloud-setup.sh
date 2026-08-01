@@ -176,6 +176,22 @@ read_ssh_pubkey_file() {
   printf '%s' "$content"
 }
 
+# Deduplicate SSH_KEYS by canonical identity — the "algo base64" portion,
+# ignoring the trailing comment — matching how tofu/main.tf reuses keys. The
+# same key can arrive via ssh-agent, a .pub file, and the support key.
+dedup_ssh_keys() {
+  local -a unique=()
+  local -A seen=()
+  local k id
+  for k in "${SSH_KEYS[@]}"; do
+    id="$(printf '%s' "$k" | awk '{print $1" "$2}')"
+    [ -n "${seen[$id]:-}" ] && continue
+    seen[$id]=1
+    unique+=("$k")
+  done
+  SSH_KEYS=("${unique[@]}")
+}
+
 ask_ssh_keys() {
   section "SSH public keys"
   SSH_KEYS=()
@@ -225,6 +241,8 @@ ask_ssh_keys() {
   else
     warn "vyhub-support key will NOT be authorized"
   fi
+
+  dedup_ssh_keys
 }
 
 ask_config_blob() {

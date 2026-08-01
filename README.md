@@ -28,11 +28,9 @@ backups out of the box.
 |-----|------|---------|-------------|
 | VYHUB_SESSION_SECRET | String, >= 32 Chars | - | A random string with at least 32 chars
 | VYHUB_BASE_URL | URL | - | The URL to the API (without `/v1`)
-| VYHUB_ROOT_PATH | Path | - | When a reverse proxy *with* path stripping is used, set this to the stripped path. For example `/api`.
-| VYHUB_PATH_PREFIX | Path | - | When a reverse proxy *without* path stripping is used, set this to path of the application. For example `/api`.
+| VYHUB_ROOT_PATH | Path | - | When a reverse proxy *without* path stripping is used, set this to path of the application. For example `/api`.
 | VYHUB_FRONTEND_URL | URL | - | The URL where the Frontend is located
 | VYHUB_GEOIP_API_URL | URL | - | The URL where the GeoIP API is located
-| VYHUB_PDF_API_URL | URL | - | The URL where the PDF API is located
 | VYHUB_CRYPT_SECRET | String, >= 32 Chars | - | A random string with at least 32 chars
 | VYHUB_INSTANCE_ID | UUID | - | The VyHub instance ID
 | VYHUB_INSTANCE_UID | Integer | - | The VyHub instance UID

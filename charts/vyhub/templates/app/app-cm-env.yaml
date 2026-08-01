@@ -12,7 +12,6 @@ data:
   {{- with .Values.app.config }}
   VYHUB_BASE_URL: "{{ .baseUrl }}"
   VYHUB_ROOT_PATH: "{{ .rootPath }}"
-  VYHUB_PATH_PREFIX: "{{ .pathPrefix }}"
   VYHUB_FRONTEND_URL: "{{ .frontendUrl }}"
   VYHUB_BACKEND_URL: "{{ .backendUrl }}"
   VYHUB_GEOIP_API_URL: "http://{{ template "vyhub.geoipApi.name" $ }}.{{ $.Release.Namespace }}.svc.cluster.local:8080"

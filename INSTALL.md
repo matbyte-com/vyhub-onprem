@@ -208,7 +208,7 @@ pruned on every nightly update.
 
 `docker-compose.yml` runs a `willfarrell/autoheal` sidecar that restarts
 any container reporting `unhealthy`. Every application service — `app`,
-`db`, `nginx`, `db-backup`, `geoip-api`, `pdf-api`, and `loki` — has a
+`db`, `nginx`, `db-backup`, `geoip-api`, and `loki` — has a
 healthcheck and the `autoheal` label; if one hangs, autoheal restarts it
 within ~30 s without operator intervention. Inspect with:
 

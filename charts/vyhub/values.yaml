@@ -503,12 +503,9 @@ app:
     ## @param app.config.baseUrl The URL to the API (without /v1)
     ##
     baseUrl: http://vyhub.local
-    ## @param app.config.rootPath When a reverse proxy with path stripping is used, set this to the stripped path. For example /api.
+    ## @param app.config.rootPath When a reverse proxy without path stripping is used, set this to path of the application. For example /api.
     ##
-    rootPath: ""
-    ## @param app.config.pathPrefix When a reverse proxy without path stripping is used, set this to path of the application. For example /api.
-    ##
-    pathPrefix: "/api"
+    rootPath: "/api"
     ## @param app.config.frontendUrl The URL where the Frontend is located
     ##
     frontendUrl: ""

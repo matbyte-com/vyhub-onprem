@@ -797,11 +797,6 @@
                         "rootPath": {
                             "type": "string",
                             "description": "When a reverse proxy with path stripping is used, set this to the stripped path. For example /api.",
-                            "default": ""
-                        },
-                        "pathPrefix": {
-                            "type": "string",
-                            "description": "When a reverse proxy without path stripping is used, set this to path of the application. For example /api.",
                             "default": "/api"
                         },
                         "frontendUrl": {
