@@ -1,6 +1,6 @@
 services:
   app:
-    image: registry.matbyte.com/vyhub/vyhub-onprem:4.0.0-dev5
+    image: registry.matbyte.com/vyhub/vyhub-onprem:4.0.0-dev7
     depends_on:
       - db
       - geoip-api
