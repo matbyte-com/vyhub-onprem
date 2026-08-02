@@ -13,13 +13,6 @@ Return the common name for geoipApi componentes
 {{- end -}}
 
 {{/*
-Return the common name for pdfApi componentes
-*/}}
-{{- define "vyhub.pdfApi.name" -}}
-  {{- printf "%s-pdf-api" (include "common.names.fullname" .) | trunc 63 -}}
-{{- end -}}
-
-{{/*
 Return the proper VyHub app image name
 */}}
 {{- define "vyhub.app.image" -}}
@@ -38,13 +31,6 @@ Return the proper VyHub image name fror the GeoIP API
 */}}
 {{- define "vyhub.geoipApi.image" -}}
 {{ include "common.images.image" (dict "imageRoot" .Values.geoipApi.image "global" .Values.global) }}
-{{- end -}}
-
-{{/*
-Return the proper VyHub image name for the PDF API
-*/}}
-{{- define "vyhub.pdfApi.image" -}}
-{{ include "common.images.image" (dict "imageRoot" .Values.pdfApi.image "global" .Values.global) }}
 {{- end -}}
 
 {{/*
@@ -80,17 +66,6 @@ Create the name of the service account to use for the VyHub GeoIP API.
     {{ default (include "vyhub.geoipApi.name" .) .Values.geoipApi.serviceAccount.name }}
 {{- else -}}
     {{ default "default" .Values.geoipApi.serviceAccount.name }}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Create the name of the service account to use for the VyHub PDF API.
-*/}}
-{{- define "vyhub.pdfApi.serviceAccountName" -}}
-{{- if .Values.pdfApi.serviceAccount.create -}}
-    {{ default (include "vyhub.pdfApi.name" .) .Values.pdfApi.serviceAccount.name }}
-{{- else -}}
-    {{ default "default" .Values.pdfApi.serviceAccount.name }}
 {{- end -}}
 {{- end -}}
 

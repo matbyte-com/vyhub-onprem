@@ -15,7 +15,6 @@ data:
   VYHUB_FRONTEND_URL: "{{ .frontendUrl }}"
   VYHUB_BACKEND_URL: "{{ .backendUrl }}"
   VYHUB_GEOIP_API_URL: "http://{{ template "vyhub.geoipApi.name" $ }}.{{ $.Release.Namespace }}.svc.cluster.local:8080"
-  VYHUB_PDF_API_URL: "http://{{ template "vyhub.pdfApi.name" $ }}.{{ $.Release.Namespace }}.svc.cluster.local:9090/v1/convert"
   VYHUB_INSTANCE_ID: "{{ .instanceId }}"
   VYHUB_INSTANCE_UID: "{{ .instanceUid }}"
   VYHUB_ADDONS: "{{ .addons | join "," }}"
